@@ -5,13 +5,14 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from rtnls_fundusprep.mask_extraction import Bounds
-
 from rtnls_enface.base import EnfaceImage
 from rtnls_enface.disc import OpticDisc
 from rtnls_enface.types import Point
 from rtnls_enface.utils.data_loading import open_mask
 from rtnls_enface.utils.image import match_resolution
+from rtnls_fundusprep.mask_extraction import Bounds
+
+
 from .base import Layer
 
 
@@ -31,16 +32,9 @@ class Fundus(EnfaceImage):
         self.load_disc(disc_path_or_mask)
         self.load_fundus_image(fundus_path_or_mask)
 
-        if layers is not None:
-            self.layers: Dict[str, Layer] = {
-                key: val if isinstance(val, Layer) else Layer(val, self, name=key)
-                for key, val in layers.items()
-            }
-
-            layer_shapes = [l.binary.shape for l in self.layers.values()]
-            assert all(s == layer_shapes[0] for s in layer_shapes)
-        else:
-            self.layers = {}
+        self.layers = layers if layers is not None else dict()
+        for layer in self.layers.values():
+            layer.retina = self
 
         self.fovea_location = (
             Point(fovea_location[1], fovea_location[0])
@@ -159,3 +153,22 @@ class Fundus(EnfaceImage):
             ax.imshow(self.disc.mask, cmap=cmap)
 
         return fig, ax
+
+    @classmethod
+    def from_file(
+        cls,
+        disc_path: str | Path = None,
+        fundus_path: str | Path = None,
+        fovea_location: Tuple[float, float] = None,
+        bounds: Bounds = None,
+        scaling_factor=1,
+    ):
+        retina = cls(
+            disc_path_or_mask=disc_path,
+            fundus_path_or_mask=fundus_path,
+            fovea_location=fovea_location,
+            scaling_factor=scaling_factor,
+            bounds=bounds,
+        )
+
+        return retina
