@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, List
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from rtnls_enface.utils.data_loading import open_mask
 from scipy import ndimage
 from scipy.spatial import distance
 
-from .types import Circle, Point, TuplePoint
+from rtnls_enface.base import Circle, Point, TuplePoint
+from rtnls_enface.utils.data_loading import open_mask
 
 if TYPE_CHECKING:
     from rtnls_enface.fundus import Fundus

@@ -5,15 +5,11 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from rtnls_enface.base import EnfaceImage
+from rtnls_enface.base import EnfaceImage, Layer, Point
 from rtnls_enface.disc import OpticDisc
-from rtnls_enface.types import Point
 from rtnls_enface.utils.data_loading import open_mask
 from rtnls_enface.utils.image import match_resolution
 from rtnls_fundusprep.mask_extraction import Bounds
-
-
-from .base import Layer
 
 
 class Fundus(EnfaceImage):

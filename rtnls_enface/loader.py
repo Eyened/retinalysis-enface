@@ -5,6 +5,7 @@ from typing import List, Tuple
 
 import pandas as pd
 from mask_extraction import Bounds
+
 from rtnls_enface.fundus import Fundus
 
 
@@ -105,8 +106,8 @@ class FundusLoader:
         cls,
         discs_folder: str | Path = None,
         fundus_folder: str | Path = None,
-        meta_path: str | Path = None,
         fovea_locations_path: str | Path = None,
+        meta_path: str | Path = None,
     ):
         if discs_folder is not None:
             disc_paths = sorted(list(Path(discs_folder).glob("*.png")))
@@ -148,7 +149,7 @@ class FundusLoader:
         else:
             fovea_locations = None
 
-        return disc_paths, fundus_paths, metadata, fovea_locations
+        return disc_paths, fundus_paths, fovea_locations, metadata
 
     @classmethod
     def from_folders(
@@ -158,10 +159,10 @@ class FundusLoader:
         path_to_fovea_locations_df: str | Path = None,
         meta_path: str = None,
     ):
-        disc_paths, fundus_paths, metadata, fovea_locations = cls._read_folders(
-            discs_folder, fundus_folder, meta_path, path_to_fovea_locations_df
+        disc_paths, fundus_paths, fovea_locations, metadata = cls._read_folders(
+            discs_folder, fundus_folder, path_to_fovea_locations_df, meta_path
         )
-        return cls(disc_paths, fundus_paths, metadata, fovea_locations)
+        return cls(disc_paths, fundus_paths, fovea_locations, metadata)
 
     @classmethod
     def from_folder(
