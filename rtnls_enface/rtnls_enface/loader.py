@@ -4,9 +4,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 import pandas as pd
-from mask_extraction import Bounds
-
-from rtnls_enface.fundus import Fundus
+from rtnls_fundusprep.mask_extraction import Bounds
 
 
 class FundusLoader:
