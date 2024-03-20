@@ -1,10 +1,14 @@
+import os
 import random
+import warnings
 from ast import Dict
 from pathlib import Path
 from typing import List, Tuple
 
 import pandas as pd
 from rtnls_fundusprep.mask_extraction import Bounds
+
+from rtnls_enface.fundus import Fundus
 
 
 class FundusLoader:
@@ -172,11 +176,21 @@ class FundusLoader:
         fovea_locations_csv: str = "fovea.csv",
     ):
         base = Path(base_folder)
+        if not os.path.exists(meta_csv):
+            warnings.warn(f"file {base/meta_csv} not found")
+            meta_csv = None
+        else:
+            meta_csv = base / meta_csv
+        if not os.path.exists(fovea_locations_csv):
+            warnings.warn(f"file {base/fovea_locations_csv} not found")
+            fovea_locations_csv = None
+        else:
+            fovea_locations_csv = base / fovea_locations_csv
         return cls.from_folders(
             base / discs_subfolder,
             base / fundus_subfolder,
-            base / fovea_locations_csv,
-            base / meta_csv,
+            fovea_locations_csv,
+            meta_csv,
         )
 
     def to_dict(self):
