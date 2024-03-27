@@ -16,5 +16,5 @@ setup(
     zip_safe=False,
     entry_points={"console_scripts": []},
     install_requires=[],
-    python_requires=">=3.10",
+    python_requires=">=3.9",
 )

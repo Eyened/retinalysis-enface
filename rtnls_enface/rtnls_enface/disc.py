@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Union
 
 import cv2
 import matplotlib.pyplot as plt
@@ -144,7 +144,7 @@ class OpticDisc:
         ax.imshow(self.mask)
 
     @classmethod
-    def from_file(cls, fpath: str | Path):
+    def from_file(cls, fpath: Union[str, Path]):
         im = open_mask(fpath)
         if len(im.shape) == 2:
             disc_mask = (im > 0).astype(np.uint8).squeeze()

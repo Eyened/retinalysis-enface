@@ -5,11 +5,12 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from rtnls_fundusprep.mask_extraction import Bounds
+
 from rtnls_enface.base import EnfaceImage, Layer, Point
 from rtnls_enface.disc import OpticDisc
 from rtnls_enface.utils.data_loading import open_mask
 from rtnls_enface.utils.image import match_resolution
-from rtnls_fundusprep.mask_extraction import Bounds
 
 
 class Fundus(EnfaceImage):
@@ -153,8 +154,8 @@ class Fundus(EnfaceImage):
     @classmethod
     def from_file(
         cls,
-        disc_path: str | Path = None,
-        fundus_path: str | Path = None,
+        disc_path: Union[str, Path] = None,
+        fundus_path: Union[str, Path] = None,
         fovea_location: Tuple[float, float] = None,
         bounds: Bounds = None,
         scaling_factor=1,

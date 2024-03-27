@@ -3,7 +3,7 @@ import random
 import warnings
 from ast import Dict
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import pandas as pd
 from rtnls_fundusprep.mask_extraction import Bounds
@@ -106,10 +106,10 @@ class FundusLoader:
     @classmethod
     def _read_folders(
         cls,
-        discs_folder: str | Path = None,
-        fundus_folder: str | Path = None,
-        fovea_locations_path: str | Path = None,
-        meta_path: str | Path = None,
+        discs_folder: Union[str, Path] = None,
+        fundus_folder: Union[str, Path] = None,
+        fovea_locations_path: Union[str, Path] = None,
+        meta_path: Union[str, Path] = None,
     ):
         if discs_folder is not None:
             disc_paths = sorted(list(Path(discs_folder).glob("*.png")))
@@ -156,9 +156,9 @@ class FundusLoader:
     @classmethod
     def from_folders(
         cls,
-        discs_folder: str | Path = None,
-        fundus_folder: str | Path = None,
-        path_to_fovea_locations_df: str | Path = None,
+        discs_folder: Union[str, Path] = None,
+        fundus_folder: Union[str, Path] = None,
+        path_to_fovea_locations_df: Union[str, Path] = None,
         meta_path: str = None,
     ):
         disc_paths, fundus_paths, fovea_locations, metadata = cls._read_folders(
@@ -169,7 +169,7 @@ class FundusLoader:
     @classmethod
     def from_folder(
         cls,
-        base_folder: str | Path,
+        base_folder: Union[str, Path],
         discs_subfolder: str = "discs",
         fundus_subfolder: str = "rgb",
         meta_csv: str = "meta.csv",
