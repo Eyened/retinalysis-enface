@@ -18,17 +18,18 @@ class FundusLoader:
         fundus_paths: List[str] = None,
         fovea_locations: List[Tuple[float, float]] = None,
         metadata: List[Dict] = None,
+        ids: List[int] = None,
     ):
         # we check that, if provided, the lengths of the inputs are all the same.
         lengths = [
             len(el)
-            for el in [disc_paths, fundus_paths, fovea_locations, metadata]
+            for el in [disc_paths, fundus_paths, fovea_locations, metadata, ids]
             if el is not None
         ]
         if len(lengths) > 0:
             assert all(
                 l == lengths[0] for l in lengths
-            ), "Input lengths are inconsistent"
+            ), f"Input lengths {lengths} are inconsistent"
             self.num_items = lengths[0]
         else:
             self.num_items = 0
@@ -37,6 +38,7 @@ class FundusLoader:
         self.fundus_paths = fundus_paths
         self.fovea_locations = fovea_locations
         self.metadata = metadata
+        self.ids = ids
         if metadata is None:
             print("Meta not provided. Fundus will be created with scaling_factor=None")
 
@@ -44,6 +46,8 @@ class FundusLoader:
 
     def _get_one_dict(self, index):
         res = dict()
+        if self.ids is not None:
+            res["id"] = self.ids[index]
         if self.disc_paths is not None:
             res["disc_path"] = self.disc_paths[index]
 
@@ -86,7 +90,7 @@ class FundusLoader:
             raise StopIteration
 
     def __len__(self):
-        return len(self.mask_paths)
+        return self.num_items
 
     def sample(self, n):
         indices = random.sample(range(len(self)), n)
@@ -111,15 +115,16 @@ class FundusLoader:
         fovea_locations_path: Union[str, Path] = None,
         meta_path: Union[str, Path] = None,
     ):
+        # either disc or fundus must be available
         if discs_folder is not None:
             disc_paths = sorted(list(Path(discs_folder).glob("*.png")))
-            disc_stems = [f.stem for f in disc_paths]
+            stems = [f.stem for f in disc_paths]
         else:
             disc_paths = None
 
         if fundus_folder is not None:
             fundus_paths = sorted(list(Path(fundus_folder).glob("*.png")))
-            fundus_stems = [f.stem for f in fundus_paths]
+            stems = [f.stem for f in fundus_paths]
         else:
             fundus_paths = None
 
@@ -129,7 +134,7 @@ class FundusLoader:
 
         if meta_path is not None:
             metadata = pd.read_csv(meta_path, index_col="id")
-            ids = disc_stems
+            ids = stems
             if metadata.index.dtype == int:
                 ids = [int(id) for id in ids]
             metadata = metadata.loc[ids].to_dict("records")
@@ -138,7 +143,7 @@ class FundusLoader:
 
         if fovea_locations_path is not None:
             fovea_locations_df = pd.read_csv(fovea_locations_path, index_col=0)
-            ids = disc_stems
+            ids = stems
             if fovea_locations_df.index.dtype == int:
                 ids = [int(id) for id in ids]
             fovea_locations_df = fovea_locations_df.loc[ids]
@@ -151,7 +156,7 @@ class FundusLoader:
         else:
             fovea_locations = None
 
-        return disc_paths, fundus_paths, fovea_locations, metadata
+        return stems, disc_paths, fundus_paths, fovea_locations, metadata
 
     @classmethod
     def from_folders(
@@ -161,10 +166,10 @@ class FundusLoader:
         path_to_fovea_locations_df: Union[str, Path] = None,
         meta_path: str = None,
     ):
-        disc_paths, fundus_paths, fovea_locations, metadata = cls._read_folders(
+        stems, disc_paths, fundus_paths, fovea_locations, metadata = cls._read_folders(
             discs_folder, fundus_folder, path_to_fovea_locations_df, meta_path
         )
-        return cls(disc_paths, fundus_paths, fovea_locations, metadata)
+        return cls(disc_paths, fundus_paths, fovea_locations, metadata, ids=stems)
 
     @classmethod
     def from_folder(
@@ -176,25 +181,23 @@ class FundusLoader:
         fovea_locations_csv: str = "fovea.csv",
     ):
         base = Path(base_folder)
-        if not os.path.exists(meta_csv):
-            warnings.warn(f"file {base/meta_csv} not found")
-            meta_csv = None
-        else:
-            meta_csv = base / meta_csv
-        if not os.path.exists(fovea_locations_csv):
-            warnings.warn(f"file {base/fovea_locations_csv} not found")
-            fovea_locations_csv = None
-        else:
-            fovea_locations_csv = base / fovea_locations_csv
+        meta_csv = base / meta_csv if meta_csv is not None else None
+        if meta_csv is not None and not os.path.exists(meta_csv):
+            warnings.warn(f"file {meta_csv} not found")
+        fovea_locations_csv = (
+            base / fovea_locations_csv if fovea_locations_csv is not None else None
+        )
+        if fovea_locations_csv is not None and not os.path.exists(fovea_locations_csv):
+            warnings.warn(f"file {fovea_locations_csv} not found")
         return cls.from_folders(
-            base / discs_subfolder,
-            base / fundus_subfolder,
+            base / discs_subfolder if discs_subfolder is not None else None,
+            base / fundus_subfolder if fundus_subfolder is not None else None,
             fovea_locations_csv,
             meta_csv,
         )
 
     def to_dict(self):
-        res = [dict() for _ in range(self.num_items)]
+        res = [{"id": self.ids[i]} for i in range(self.num_items)]
         if self.disc_paths is not None:
             for i, fp in enumerate(self.disc_paths):
                 res[i]["disc_path"] = fp

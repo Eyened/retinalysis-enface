@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import cv2
 import numpy as np
@@ -23,8 +23,9 @@ class Fundus(EnfaceImage):
         bounds: Bounds = None,
         scaling_factor=1.0,
         resolution=(1024, 1024),
+        id: Any = None,
     ):
-        self.id = None
+        self.id = id
         self.resolution = resolution
         self.load_disc(disc_path_or_mask)
         self.load_fundus_image(fundus_path_or_mask)
@@ -99,6 +100,11 @@ class Fundus(EnfaceImage):
         pixels_within_circle = laplacian[mask == 255]
         return np.var(pixels_within_circle)
 
+    def etdrs_point(self) -> Point:
+        if self.disc is None or self.fovea_location is None:
+            return None
+        return self.disc.closest_point(self.fovea_location)
+
     def plot_fundus(self, ax=None, fig=None):
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
@@ -146,6 +152,14 @@ class Fundus(EnfaceImage):
                 s=2,
             )
 
+        etdrs_point = self.etdrs_point()
+        if etdrs_point is not None:
+            ax.scatter(
+                *etdrs_point.tuple_xy,
+                c="pink",
+                s=2,
+            )
+
         if self.disc is not None and disc:
             ax.imshow(self.disc.mask, cmap=cmap)
 
@@ -159,6 +173,7 @@ class Fundus(EnfaceImage):
         fovea_location: Tuple[float, float] = None,
         bounds: Bounds = None,
         scaling_factor=1,
+        id: Any = None,
     ):
         retina = cls(
             disc_path_or_mask=disc_path,
@@ -166,6 +181,7 @@ class Fundus(EnfaceImage):
             fovea_location=fovea_location,
             scaling_factor=scaling_factor,
             bounds=bounds,
+            id=id,
         )
 
         return retina

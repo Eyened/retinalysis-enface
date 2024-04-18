@@ -28,7 +28,7 @@ class OpticDisc:
         labeled_array, num_features = ndimage.label(mask)
 
         if num_features == 0:
-            raise RuntimeError("Found no connected components for disc mask. ")
+            warnings.warn("Found no connected components for disc mask. ")
         elif num_features >= 2:
             warnings.warn("Found more than one connected component for disc mask. ")
             # Find the size of each connected component
@@ -135,6 +135,20 @@ class OpticDisc:
                 min_distances.append(distance_to_circle)
 
         return np.min(min_distances)
+
+    def closest_point(self, point: Point) -> Point:
+        # Identify the blob points
+        blob_points = np.argwhere(self.mask > 0)
+
+        # Calculate distances from each blob point to the target point
+        distances = np.sqrt(((blob_points - point.tuple) ** 2).sum(axis=1))
+
+        # Find the index of the closest point
+        closest_point_index = np.argmin(distances)
+
+        # Return the closest blob point
+        p = blob_points[closest_point_index]
+        return Point(p[0], p[1])
 
     def plot(self, ax=None, fig=None):
         if ax is None:

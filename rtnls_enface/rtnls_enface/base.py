@@ -57,6 +57,10 @@ class Point:
     def tuple_xy(self):
         return (self.x, self.y)
 
+    @property
+    def numpy(self):
+        return np.array([self.x, self.y], dtype=float)
+
     def distance_to(self, point: Point):
         return distance.euclidean(self.tuple, point.tuple)
 
@@ -81,24 +85,14 @@ class Line:
 
     def angle_to(self, line: Line):
         # Convert points to vectors
-        v1 = np.array(self.p2.tuple_xy) - np.array(self.p1.tuple_xy)
-        v2 = np.array(line.p2.tuple_xy) - np.array(line.p1.tuple_xy)
+        v1 = self.p2.numpy - self.p1.numpy
+        v2 = line.p2.numpy - line.p1.numpy
 
-        # Calculate the dot product of v1 and v2
-        dot_product = np.dot(v1, v2)
-
-        # Calculate the magnitude of v1 and v2
-        magnitude_v1 = np.linalg.norm(v1)
-        magnitude_v2 = np.linalg.norm(v2)
-
-        # Calculate the cosine of the angle between v1 and v2
-        cos_angle = dot_product / (magnitude_v1 * magnitude_v2)
-
-        # Ensure the cosine value is within the valid range
-        cos_angle = np.clip(cos_angle, -1, 1)
+        unit_v1 = v1 / np.linalg.norm(v1)
+        unit_v2 = v2 / np.linalg.norm(v2)
 
         # Calculate the angle in radians
-        angle_radians = np.arccos(cos_angle)
+        angle_radians = np.arccos(np.dot(unit_v1, unit_v2))
 
         # Convert the angle to degrees
         angle_degrees = np.degrees(angle_radians)
