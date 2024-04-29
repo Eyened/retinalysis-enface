@@ -118,7 +118,7 @@ class Fundus(EnfaceImage):
         return fig, ax
 
     def plot(self, layers=None, ax=None, fig=None, disc=True):
-        # with plt.ioff():
+        plt.ioff()
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
             ax.set_axis_off()

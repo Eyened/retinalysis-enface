@@ -21,18 +21,6 @@ class FundusLoader:
         ids: List[int] = None,
     ):
         # we check that, if provided, the lengths of the inputs are all the same.
-        lengths = [
-            len(el)
-            for el in [disc_paths, fundus_paths, fovea_locations, metadata, ids]
-            if el is not None
-        ]
-        if len(lengths) > 0:
-            assert all(
-                l == lengths[0] for l in lengths
-            ), f"Input lengths {lengths} are inconsistent"
-            self.num_items = lengths[0]
-        else:
-            self.num_items = 0
 
         self.disc_paths = disc_paths
         self.fundus_paths = fundus_paths
@@ -43,6 +31,24 @@ class FundusLoader:
             print("Meta not provided. Fundus will be created with scaling_factor=None")
 
         self.count = -1
+        print(
+            len(fundus_paths),
+            len(ids),
+        )
+        self.num_items = self._check_lengths(
+            disc_paths, fundus_paths, fovea_locations, metadata, ids
+        )
+
+    def _check_lengths(self, *elems):
+        lengths = [len(el) for el in elems if el is not None]
+        if len(lengths) > 0:
+            assert all(
+                l == lengths[0] for l in lengths
+            ), f"Input lengths {lengths} are inconsistent"
+            num_items = lengths[0]
+        else:
+            num_items = 0
+        return num_items
 
     def _get_one_dict(self, index):
         res = dict()
@@ -108,6 +114,78 @@ class FundusLoader:
         return FundusLoader(mask_paths, disc_paths, fundus_paths, self.meta_path)
 
     @classmethod
+    def _get_filenames(cls, *file_lists):
+        stem_dicts = [
+            None if file_list is None else {Path(p).stem: p for p in file_list}
+            for file_list in file_lists
+        ]
+        stems = [list(d.keys()) for d in stem_dicts if d is not None]
+        intersection = set.intersection(*[set(lst) for lst in stems])
+        stems = sorted(list(intersection))
+
+        filtered_lists = [
+            None
+            if d is None
+            else [
+                d[stem] for stem in stems
+            ]  # sorted([fp for fp in file_list if Path(fp).stem in intersection])
+            for d in stem_dicts
+        ]
+        return filtered_lists, stems
+
+    @classmethod
+    def _read_meta(cls, meta_path, ids):
+        if meta_path is None:
+            return None
+        metadata = pd.read_csv(meta_path, index_col="id")
+        if metadata.index.dtype == int:
+            ids = [int(id) for id in ids]
+        metadata = metadata.loc[ids].to_dict("records")
+        return metadata
+
+    @classmethod
+    def _read_fovea_locations(cls, fovea_locations_path, ids):
+        if fovea_locations_path is None:
+            return None
+        fovea_locations_df = pd.read_csv(fovea_locations_path, index_col=0)
+        if fovea_locations_df.index.dtype == int:
+            ids = [int(id) for id in ids]
+        fovea_locations_df = fovea_locations_df.loc[ids]
+        fovea_locations = list(
+            zip(
+                fovea_locations_df["mean_x"].to_list(),
+                fovea_locations_df["mean_y"].to_list(),
+            )
+        )
+        return fovea_locations
+
+    # @classmethod
+    # def _prep_paths(cls, disc_paths, fundus_paths, fovea_locations_path, meta_path):
+    #     if disc_paths is not None:
+    #         stems = [Path(p).stem for p in disc_paths]
+    #     elif fundus_paths is not None:
+    #         stems = [Path(p).stem for p in fundus_paths]
+    #     else:
+    #         raise ValueError("Either disc_paths or fundus_paths must be provided")
+    #     if disc_paths is not None and fundus_paths is not None:
+    #         for dp, fp in zip(disc_paths, fundus_paths):
+    #             assert Path(dp).stem == Path(fp).stem
+
+    #     return disc_paths, fundus_paths, fovea_locations, metadata, stems
+
+    @classmethod
+    def from_paths(cls, disc_paths, fundus_paths, fovea_locations_path, meta_path):
+        if disc_paths is None and fundus_paths is None:
+            raise ValueError("Either disc_paths or fundus_paths must be provided")
+        (disc_paths, fundus_paths), stems = cls._get_filenames(disc_paths, fundus_paths)
+        # disc_paths, fundus_paths, fovea_locations, metadata, ids = cls._prep_paths(
+        #     disc_paths, fundus_paths, fovea_locations_path, meta_path
+        # )
+        fovea_locations = cls._read_fovea_locations(fovea_locations_path, stems)
+        metadata = cls._read_meta(meta_path, stems)
+        return cls(disc_paths, fundus_paths, fovea_locations, metadata, stems)
+
+    @classmethod
     def _read_folders(
         cls,
         discs_folder: Union[str, Path] = None,
@@ -115,47 +193,20 @@ class FundusLoader:
         fovea_locations_path: Union[str, Path] = None,
         meta_path: Union[str, Path] = None,
     ):
-        # either disc or fundus must be available
-        if discs_folder is not None:
-            disc_paths = sorted(list(Path(discs_folder).glob("*.png")))
-            stems = [f.stem for f in disc_paths]
-        else:
-            disc_paths = None
-
-        if fundus_folder is not None:
-            fundus_paths = sorted(list(Path(fundus_folder).glob("*.png")))
-            stems = [f.stem for f in fundus_paths]
-        else:
-            fundus_paths = None
-
-        if disc_paths is not None and fundus_paths is not None:
-            for dp, fp in zip(disc_paths, fundus_paths):
-                assert dp.stem == fp.stem
-
-        if meta_path is not None:
-            metadata = pd.read_csv(meta_path, index_col="id")
-            ids = stems
-            if metadata.index.dtype == int:
-                ids = [int(id) for id in ids]
-            metadata = metadata.loc[ids].to_dict("records")
-        else:
-            metadata = None
-
-        if fovea_locations_path is not None:
-            fovea_locations_df = pd.read_csv(fovea_locations_path, index_col=0)
-            ids = stems
-            if fovea_locations_df.index.dtype == int:
-                ids = [int(id) for id in ids]
-            fovea_locations_df = fovea_locations_df.loc[ids]
-            fovea_locations = list(
-                zip(
-                    fovea_locations_df["mean_x"].to_list(),
-                    fovea_locations_df["mean_y"].to_list(),
-                )
-            )
-        else:
-            fovea_locations = None
-
+        # either disc or fundus must be available'
+        disc_paths = (
+            sorted(list(Path(discs_folder).glob("*.png")))
+            if discs_folder is not None
+            else None
+        )
+        fundus_paths = (
+            sorted(list(Path(fundus_folder).glob("*.png")))
+            if fundus_folder is not None
+            else None
+        )
+        (disc_paths, fundus_paths), stems = cls._get_filenames(disc_paths, fundus_paths)
+        fovea_locations = cls._read_fovea_locations(fovea_locations_path, stems)
+        metadata = cls._read_meta(meta_path, stems)
         return stems, disc_paths, fundus_paths, fovea_locations, metadata
 
     @classmethod
