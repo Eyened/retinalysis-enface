@@ -30,11 +30,7 @@ class FundusLoader:
         if metadata is None:
             print("Meta not provided. Fundus will be created with scaling_factor=None")
 
-        self.count = -1
-        print(
-            len(fundus_paths),
-            len(ids),
-        )
+        # self.count = -1
         self.num_items = self._check_lengths(
             disc_paths, fundus_paths, fovea_locations, metadata, ids
         )
@@ -86,14 +82,15 @@ class FundusLoader:
         return self[self.id_to_index[id]]
 
     def __iter__(self):
-        return self
+        for i in range(self.num_items):
+            yield self[i]
 
-    def __next__(self):
-        if self.count < self.num_items - 1:
-            self.count += 1
-            return self[self.count]
-        else:
-            raise StopIteration
+    # def __next__(self):
+    #     if self.count < self.num_items - 1:
+    #         self.count += 1
+    #         return self[self.count]
+    #     else:
+    #         raise StopIteration
 
     def __len__(self):
         return self.num_items

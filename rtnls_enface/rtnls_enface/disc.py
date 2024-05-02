@@ -152,10 +152,18 @@ class OpticDisc:
 
     def plot(self, ax=None, fig=None):
         if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
-            ax.set_axis_off()
+            if self.fundus is not None:
+                fig, ax = self.fundus.plot_fundus()
+            else:
+                fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
+                ax.set_axis_off()
 
-        ax.imshow(self.mask)
+        im = self.mask
+        cmap = plt.get_cmap("binary")
+        cmap.set_bad((0, 0, 0, 0))
+        masked = np.ma.masked_where(im == 0, im)
+        ax.imshow(masked, cmap=cmap, interpolation="nearest")
+        return fig, ax
 
     @classmethod
     def from_file(cls, fpath: Union[str, Path]):

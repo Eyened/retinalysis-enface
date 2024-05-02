@@ -117,7 +117,7 @@ class Fundus(EnfaceImage):
 
         return fig, ax
 
-    def plot(self, layers=None, ax=None, fig=None, disc=True):
+    def plot(self, layers=None, ax=None, fig=None, disc=True, fovea=True):
         plt.ioff()
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
@@ -144,7 +144,7 @@ class Fundus(EnfaceImage):
         for k, l in layers.items():
             l.plot(ax, fig)
 
-        if self.fovea_location is not None:
+        if self.fovea_location is not None and fovea:
             ax.scatter(
                 x=self.fovea_location.tuple[1],
                 y=self.fovea_location.tuple[0],
@@ -152,13 +152,13 @@ class Fundus(EnfaceImage):
                 s=2,
             )
 
-        etdrs_point = self.etdrs_point()
-        if etdrs_point is not None:
-            ax.scatter(
-                *etdrs_point.tuple_xy,
-                c="pink",
-                s=2,
-            )
+        # etdrs_point = self.etdrs_point()
+        # if etdrs_point is not None:
+        #     ax.scatter(
+        #         *etdrs_point.tuple_xy,
+        #         c="pink",
+        #         s=2,
+        #     )
 
         if self.disc is not None and disc:
             ax.imshow(self.disc.mask, cmap=cmap)
