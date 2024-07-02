@@ -27,6 +27,7 @@ class FundusLoader:
         self.fovea_locations = fovea_locations
         self.metadata = metadata
         self.ids = ids
+        self.id_to_index = {id: i for i, id in enumerate(ids)}
         if metadata is None:
             print("Meta not provided. Fundus will be created with scaling_factor=None")
 

@@ -43,3 +43,4 @@ def plot_rows(plot_fn, nrows=4, ncols=2):
     )
     for i in range(nrows):
         plot_fn(axs=axs[i * ncols : (i + 1) * ncols], row=i, fig=fig)
+    return fig, axs
