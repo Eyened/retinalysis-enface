@@ -3,17 +3,36 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Tuple, Union
 
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy.spatial import distance
 
 if TYPE_CHECKING:
-    from vascx.retina import Retina
+    from vascx.fundus.retina import Retina
 
 
 class EnfaceImage:
-    pass
+    def __init__(
+        self,
+        image: np.array = None,
+        id: Any = None,
+    ):
+        self.image = image
+        self.id = id
+
+    def plot_image(self, ax=None, fig=None):
+        if ax is None:
+            fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
+            ax.set_axis_off()
+
+        if self.image is None:
+            return
+
+        ax.imshow(self.image)
+
+        return fig, ax
 
 
 class Layer:

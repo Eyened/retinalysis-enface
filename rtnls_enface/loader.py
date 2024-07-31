@@ -154,9 +154,6 @@ class FundusLoader:
         if disc_paths is None and fundus_paths is None:
             raise ValueError("Either disc_paths or fundus_paths must be provided")
         (disc_paths, fundus_paths), stems = cls._get_filenames(disc_paths, fundus_paths)
-        # disc_paths, fundus_paths, fovea_locations, metadata, ids = cls._prep_paths(
-        #     disc_paths, fundus_paths, fovea_locations_path, meta_path
-        # )
         fovea_locations = cls._read_fovea_locations(fovea_locations_path, stems)
         metadata = cls._read_meta(meta_path, stems)
         return cls(disc_paths, fundus_paths, fovea_locations, metadata, stems)
