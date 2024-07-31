@@ -5,12 +5,12 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-from rtnls_fundusprep.mask_extraction import Bounds
 
 from rtnls_enface.base import EnfaceImage, Layer, Point
 from rtnls_enface.disc import OpticDisc
 from rtnls_enface.utils.data_loading import open_mask
 from rtnls_enface.utils.image import match_resolution
+from rtnls_fundusprep.mask_extraction import Bounds
 
 
 class Fundus(EnfaceImage):
@@ -129,13 +129,6 @@ class Fundus(EnfaceImage):
         colors = [(0, 0, 0, 0), (1, 1, 1, 1)]
         cmap = LinearSegmentedColormap.from_list("binary", colors, N=2)
 
-        # if disc and self.disc is not None:
-        #     cir = plt.Circle(self.disc.center, self.disc.radius,
-        #                      color='g', fill=False)
-        #     ax.add_patch(cir)
-        # ax.plot(self.disc.contour[:,0], self.disc.contour[:,1], marker='o', markersize=1)
-        # ax.scatter([self.disc.center[0]], [self.disc.center[1]])
-
         if layers is not None:
             layers = {l: self.layers[l] for l in layers}
         else:
@@ -151,14 +144,6 @@ class Fundus(EnfaceImage):
                 c="green",
                 s=2,
             )
-
-        # etdrs_point = self.etdrs_point()
-        # if etdrs_point is not None:
-        #     ax.scatter(
-        #         *etdrs_point.tuple_xy,
-        #         c="pink",
-        #         s=2,
-        #     )
 
         if self.disc is not None and disc:
             ax.imshow(self.disc.mask, cmap=cmap)

@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import List, Tuple, Union
 
 import pandas as pd
-from rtnls_fundusprep.mask_extraction import Bounds
 
 from rtnls_enface.fundus import Fundus
+from rtnls_fundusprep.mask_extraction import Bounds
 
 
 class FundusLoader:
@@ -31,7 +31,6 @@ class FundusLoader:
         if metadata is None:
             print("Meta not provided. Fundus will be created with scaling_factor=None")
 
-        # self.count = -1
         self.num_items = self._check_lengths(
             disc_paths, fundus_paths, fovea_locations, metadata, ids
         )
@@ -85,13 +84,6 @@ class FundusLoader:
     def __iter__(self):
         for i in range(self.num_items):
             yield self[i]
-
-    # def __next__(self):
-    #     if self.count < self.num_items - 1:
-    #         self.count += 1
-    #         return self[self.count]
-    #     else:
-    #         raise StopIteration
 
     def __len__(self):
         return self.num_items
@@ -156,20 +148,6 @@ class FundusLoader:
             )
         )
         return fovea_locations
-
-    # @classmethod
-    # def _prep_paths(cls, disc_paths, fundus_paths, fovea_locations_path, meta_path):
-    #     if disc_paths is not None:
-    #         stems = [Path(p).stem for p in disc_paths]
-    #     elif fundus_paths is not None:
-    #         stems = [Path(p).stem for p in fundus_paths]
-    #     else:
-    #         raise ValueError("Either disc_paths or fundus_paths must be provided")
-    #     if disc_paths is not None and fundus_paths is not None:
-    #         for dp, fp in zip(disc_paths, fundus_paths):
-    #             assert Path(dp).stem == Path(fp).stem
-
-    #     return disc_paths, fundus_paths, fovea_locations, metadata, stems
 
     @classmethod
     def from_paths(cls, disc_paths, fundus_paths, fovea_locations_path, meta_path):
