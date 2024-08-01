@@ -12,13 +12,18 @@ from rtnls_enface.utils.data_loading import open_image, open_mask
 
 class FAZEnface(EnfaceImage):
     def __init__(
-        self, faz_mask: np.array = None, layers: Dict[str, Layer] = None, **kwargs
+        self,
+        faz_mask: np.array = None,
+        layers: Dict[str, Layer] = None,
+        resolution=(320, 320),
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.faz = FAZ(faz_mask, faz_enface=self) if faz_mask is not None else None
         self.layers = layers if layers is not None else dict()
         for layer in self.layers.values():
             layer.retina = self
+        self.resolution = resolution
 
     def plot(self, layers=None, ax=None, fig=None, disc=True, fovea=True):
         plt.ioff()

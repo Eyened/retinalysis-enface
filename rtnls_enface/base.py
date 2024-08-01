@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Optional, Set, Tuple, Union
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from vascx.fundus.retina import Retina
 
 
-class EnfaceImage:
+class EnfaceImage(ABC):
     def __init__(
         self,
         image: np.array = None,
@@ -33,6 +34,11 @@ class EnfaceImage:
         ax.imshow(self.image)
 
         return fig, ax
+
+    @classmethod
+    @abstractmethod
+    def from_file(cls, *args, **kwargs):
+        pass
 
 
 class Layer:
