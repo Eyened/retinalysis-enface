@@ -23,6 +23,7 @@ setup(
         "opencv-python == 4.*",
         "matplotlib==3.*",
         "joblib==1.*",
+        "tqdm == 4.*",
         "Pillow == 9.*",
         "click==8.*",
         "pydicom==2.3.1",
