@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Dict, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Tuple, Union
 
 import cv2
 import numpy as np
@@ -10,7 +12,9 @@ from rtnls_enface.base import EnfaceImage, Layer, Point
 from rtnls_enface.disc import OpticDisc
 from rtnls_enface.utils.data_loading import open_mask
 from rtnls_enface.utils.image import match_resolution
-from rtnls_fundusprep.mask_extraction import Bounds
+
+if TYPE_CHECKING:
+    from rtnls_fundusprep.mask_extraction import Bounds
 
 
 class Fundus(EnfaceImage):
@@ -39,9 +43,6 @@ class Fundus(EnfaceImage):
             if fovea_location is not None
             else None
         )
-        if bounds is None:
-            r = resolution[0] / 2
-            bounds = Bounds(*resolution, r, r, r, 0, 0, *resolution)
         self.bounds = bounds
         self.scaling_factor = scaling_factor
 
