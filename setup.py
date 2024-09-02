@@ -19,11 +19,13 @@ setup(
         "numpy == 1.*",
         "pandas == 2.*",
         "scikit-learn==1.*",
+        "scipy == 1.*",
         "opencv-python == 4.*",
         "matplotlib==3.*",
         "joblib==1.*",
         "Pillow == 9.*",
         "click==8.*",
+        "pydicom==2.3.1",
     ],
     python_requires=">=3.9",
 )
