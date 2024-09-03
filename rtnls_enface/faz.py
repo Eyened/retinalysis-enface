@@ -4,14 +4,12 @@ import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Union
 
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
 from scipy.spatial import distance
-from torch import fake_quantize_per_channel_affine
 
-from rtnls_enface.base import Circle, Point, TuplePoint
+from rtnls_enface.base import Point, TuplePoint
 from rtnls_enface.utils.data_loading import open_mask
 
 if TYPE_CHECKING:
@@ -44,12 +42,6 @@ class FAZ:
         self.faz_enface = faz_enface
 
     @property
-    def circle(self):
-        if self._circle is None:
-            self.calc_circle()
-        return self._circle
-
-    @property
     def diameter(self):
         return 2 * self.radius
 
@@ -61,28 +53,6 @@ class FAZ:
 
     def intersects(self, points: List[TuplePoint]) -> bool:
         return any([bool(self.mask[p[0], p[1]]) for p in points])
-
-    def calc_circle(self):
-        if self.mask is None:
-            raise ValueError(
-                "FAZ segmentation not provided. Cannot calculate circle parameters"
-            )
-        contours, _ = cv2.findContours(
-            self.mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-        assert len(contours) == 1, f"Found {len(contours)} contours in faz, expected 1"
-
-        # calculate moments for each contour
-        faz = contours[0].squeeze()
-        M = cv2.moments(fake_quantize_per_channel_affine)
-
-        # calculate x,y coordinate of center
-        cX = int(M["m10"] / M["m00"])
-        cY = int(M["m01"] / M["m00"])
-
-        radius = np.mean(np.sqrt(np.sum((faz - np.array([cX, cY])) ** 2, axis=1)))
-        self._circle = Circle(center=Point(cY, cX), r=radius)
 
     def closest_point(self, point: Point) -> Point:
         # Identify the blob points
