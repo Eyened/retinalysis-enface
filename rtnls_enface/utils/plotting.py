@@ -34,7 +34,7 @@ def plot_grid(plot_fn, nrows=4, ncols=4):
 
 
 def plot_rows(plot_fn, nrows=4, ncols=2):
-    fig = plt.figure(figsize=(nrows * 4, ncols * 4))
+    fig = plt.figure(figsize=(nrows * 4, ncols * 4), dpi=300)
     axs = ImageGrid(
         fig,
         111,  # similar to subplot(111)

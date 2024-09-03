@@ -1,9 +1,8 @@
 import os
 import random
 import warnings
-from ast import Dict
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import Any, Dict, List, Union
 
 import pandas as pd
 
@@ -11,151 +10,132 @@ from rtnls_enface.fundus import Fundus
 from rtnls_fundusprep.mask_extraction import Bounds
 
 
-class FundusLoader:
+class PairedFileLoader:
     def __init__(
         self,
-        disc_paths: List[str] = None,
-        fundus_paths: List[str] = None,
-        fovea_locations: List[Tuple[float, float]] = None,
-        metadata: List[Dict] = None,
-        ids: List[int] = None,
+        items=Dict[str, Dict[str, Any]],
     ):
         # we check that, if provided, the lengths of the inputs are all the same.
+        self.items = items
+        self.indices = list(items.keys())
 
-        self.disc_paths = disc_paths
-        self.fundus_paths = fundus_paths
-        self.fovea_locations = fovea_locations
-        self.metadata = metadata
-        self.ids = ids
-        self.id_to_index = {id: i for i, id in enumerate(ids)}
-        if metadata is None:
-            print("Meta not provided. Fundus will be created with scaling_factor=None")
-
-        self.num_items = self._check_lengths(
-            disc_paths, fundus_paths, fovea_locations, metadata, ids
-        )
-
-    def _check_lengths(self, *elems):
-        lengths = [len(el) for el in elems if el is not None]
-        if len(lengths) > 0:
-            assert all(
-                l == lengths[0] for l in lengths
-            ), f"Input lengths {lengths} are inconsistent"
-            num_items = lengths[0]
-        else:
-            num_items = 0
-        return num_items
-
-    def _get_one_dict(self, index):
-        res = dict()
-        if self.ids is not None:
-            res["id"] = self.ids[index]
-        if self.disc_paths is not None:
-            res["disc_path"] = self.disc_paths[index]
-
-        if self.fundus_paths is not None:
-            res["fundus_path"] = self.fundus_paths[index]
-
-        if self.fovea_locations is not None:
-            res["fovea_location"] = self.fovea_locations[index]
-
-        if self.metadata is not None:
-            bounds = Bounds(**self.metadata[index])
-            M = bounds.get_cropping_matrix(1024)
-            res["bounds"] = bounds.warp(M, (1024, 1024))
-
-        return res
-
-    def _get_one(self, index):
-        return Fundus.from_file(**self._get_one_dict(index))
+    def make_object(self, index):
+        raise NotImplementedError()
 
     def __getitem__(self, key):
         if isinstance(key, slice):
             start = key.start if key.start is not None else 0
             stop = key.stop if key.stop is not None else len(self)
             step = key.step if key.step is not None else 1
-            return [self._get_one(i) for i in range(start, stop, step)]
+            return [self.make_object(self.indices[i]) for i in range(start, stop, step)]
         else:
-            return self._get_one(key)
+            return self.make_object(self.indices[key])
 
     def by_id(self, id):
-        return self[self.id_to_index[id]]
+        return self.make_object(id)
 
     def __iter__(self):
-        for i in range(self.num_items):
+        for i in range(len(self)):
             yield self[i]
 
     def __len__(self):
-        return self.num_items
+        return len(self.items)
 
     def sample(self, n):
         indices = random.sample(range(len(self)), n)
-        mask_paths = [self.mask_paths[i] for i in indices]
-        disc_paths = (
-            [self.disc_paths[i] for i in indices]
-            if self.disc_paths is not None
-            else None
-        )
-        fundus_paths = (
-            [self.fundus_paths[i] for i in indices]
-            if self.fundus_paths is not None
-            else None
-        )
-        return FundusLoader(mask_paths, disc_paths, fundus_paths, self.meta_path)
+
+        items = {self.indices[i]: self.items[self.indices[i]] for i in indices}
+        return self.__class__(items)
+
+    def to_dict(self):
+        return list(self.items.values())
 
     @classmethod
-    def _get_filenames(cls, *file_lists):
-        stem_dicts = [
-            None if file_list is None else {Path(p).stem: p for p in file_list}
-            for file_list in file_lists
-        ]
-        stems = [list(d.keys()) for d in stem_dicts if d is not None]
+    def _get_items_from_files(
+        cls, **file_lists: Dict[str, List[str | Path]]
+    ) -> Dict[str, Dict[str, Any]]:
+        stem_dicts = {
+            key: None if file_list is None else {Path(p).stem: p for p in file_list}
+            for key, file_list in file_lists.items()
+        }
+        for key, d in stem_dicts.items():
+            if d is not None:
+                print(f"Folder {key}: {len(d)} files")
+
+        stems = [list(d.keys()) for d in stem_dicts.values() if d is not None]
         intersection = set.intersection(*[set(lst) for lst in stems])
         stems = sorted(list(intersection))
 
-        filtered_lists = [
-            None
-            if d is None
-            else [
-                d[stem] for stem in stems
-            ]  # sorted([fp for fp in file_list if Path(fp).stem in intersection])
-            for d in stem_dicts
-        ]
-        return filtered_lists, stems
+        items = {
+            stem: {
+                key: (d[stem] if d is not None else None)
+                for key, d in stem_dicts.items()
+            }
+            for stem in stems
+        }
+        for key, item in items.items():
+            item["id"] = key
+        return items
 
     @classmethod
-    def _read_meta(cls, meta_path, ids):
+    def _get_items_from_folders(
+        cls, **folders: Dict[str, str | Path]
+    ) -> Dict[str, Dict[str, Any]]:
+        file_lists = {
+            key: sorted(list(Path(folder).glob("*.png")))
+            if folder is not None
+            else None
+            for key, folder in folders.items()
+        }
+        return cls._get_items_from_files(**file_lists)
+
+
+class FundusLoader(PairedFileLoader):
+    def get_item(self, id):
+        item = self.items[id]
+        if "metadata" in item:
+            bounds = Bounds(**item["metadata"])
+            M = bounds.get_cropping_matrix(1024)
+            item["bounds"] = bounds.warp(M, (1024, 1024))
+        return item
+
+    def make_object(self, id):
+        return Fundus.from_file(**self.get_item(id))
+
+    @classmethod
+    def _add_meta(cls, items: Dict[str, Dict[str, Any]], meta_path):
         if meta_path is None:
-            return None
+            return
         metadata = pd.read_csv(meta_path, index_col="id")
-        if metadata.index.dtype == int:
-            ids = [int(id) for id in ids]
-        metadata = metadata.loc[ids].to_dict("records")
-        return metadata
+        metadata.index = metadata.index.astype(str)
+
+        for id, item in items.items():
+            item["metadata"] = metadata.loc[id].to_dict()
 
     @classmethod
-    def _read_fovea_locations(cls, fovea_locations_path, ids):
+    def _add_fovea_locations(
+        cls, items: Dict[str, Dict[str, Any]], fovea_locations_path
+    ):
         if fovea_locations_path is None:
-            return None
+            return
         fovea_locations_df = pd.read_csv(fovea_locations_path, index_col=0)
-        if fovea_locations_df.index.dtype == int:
-            ids = [int(id) for id in ids]
-        fovea_locations_df = fovea_locations_df.loc[ids]
-        fovea_locations = list(
-            zip(
-                fovea_locations_df["mean_x"].to_list(),
-                fovea_locations_df["mean_y"].to_list(),
+        fovea_locations_df.index = fovea_locations_df.index.astype(str)
+
+        for id, item in items.items():
+            item["fovea_location"] = (
+                fovea_locations_df.loc[id, "mean_x"],
+                fovea_locations_df.loc[id, "mean_y"],
             )
-        )
-        return fovea_locations
 
     @classmethod
     def from_paths(cls, disc_paths, fundus_paths, fovea_locations_path, meta_path):
         if disc_paths is None and fundus_paths is None:
             raise ValueError("Either disc_paths or fundus_paths must be provided")
-        (disc_paths, fundus_paths), stems = cls._get_filenames(disc_paths, fundus_paths)
+        (disc_paths, fundus_paths), stems = cls._get_items_from_files(
+            disc_paths, fundus_paths
+        )
         fovea_locations = cls._read_fovea_locations(fovea_locations_path, stems)
-        metadata = cls._read_meta(meta_path, stems)
+        metadata = cls._add_meta(meta_path, stems)
         return cls(disc_paths, fundus_paths, fovea_locations, metadata, stems)
 
     @classmethod
@@ -167,19 +147,12 @@ class FundusLoader:
         meta_path: Union[str, Path] = None,
     ):
         # either disc or fundus must be available'
-        disc_paths = (
-            sorted(list(Path(discs_folder).glob("*.png")))
-            if discs_folder is not None
-            else None
+
+        (disc_paths, fundus_paths), stems = cls._get_items_from_folders(
+            discs_folder, fundus_folder
         )
-        fundus_paths = (
-            sorted(list(Path(fundus_folder).glob("*.png")))
-            if fundus_folder is not None
-            else None
-        )
-        (disc_paths, fundus_paths), stems = cls._get_filenames(disc_paths, fundus_paths)
         fovea_locations = cls._read_fovea_locations(fovea_locations_path, stems)
-        metadata = cls._read_meta(meta_path, stems)
+        metadata = cls._add_meta(meta_path, stems)
         return stems, disc_paths, fundus_paths, fovea_locations, metadata
 
     @classmethod
@@ -219,19 +192,3 @@ class FundusLoader:
             fovea_locations_csv,
             meta_csv,
         )
-
-    def to_dict(self):
-        res = [{"id": self.ids[i]} for i in range(self.num_items)]
-        if self.disc_paths is not None:
-            for i, fp in enumerate(self.disc_paths):
-                res[i]["disc_path"] = fp
-
-        if self.fundus_paths is not None:
-            for i, fp in enumerate(self.fundus_paths):
-                res[i]["fundus_path"] = fp
-
-        if self.fovea_locations is not None:
-            for i, l in enumerate(self.fovea_locations):
-                res[i]["fovea_location"] = l
-
-        return res

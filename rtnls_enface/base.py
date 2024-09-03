@@ -125,6 +125,40 @@ class Line:
         # Since lines are undirected, the smallest angle can be the complement to 180 if it's larger than 90 degrees
         return angle_degrees
 
+    def counterclockwise_angle_to(self, line: Line):
+        """
+        Calculate the counterclockwise angle from the first line to the second line.
+
+        Returns:
+            angle (float): The counterclockwise angle between the two lines in degrees.
+        """
+
+        # Calculate slopes
+        x1, y1 = self.p1.tuple_xy
+        x2, y2 = self.p2.tuple_xy
+        x3, y3 = line.p1.tuple_xy
+        x4, y4 = line.p2.tuple_xy
+
+        # Calculate the direction vectors of the two lines
+        dx1, dy1 = x2 - x1, y2 - y1
+        dx2, dy2 = x4 - x3, y4 - y3
+
+        # Calculate the angle in radians using arctan2
+        angle1 = np.arctan2(dy1, dx1)
+        angle2 = np.arctan2(dy2, dx2)
+
+        # Calculate the counterclockwise angle
+        angle_rad = angle2 - angle1
+
+        # Convert the angle to degrees
+        angle_deg = np.degrees(angle_rad)
+
+        # Adjust the angle to ensure it's between 0 and 360 degrees
+        if angle_deg < 0:
+            angle_deg += 360
+
+        return angle_deg
+
     def point_at(self, fraction: float):
         p1, p2 = self.p1, self.p2
         x = p1.x + (p2.x - p1.x) * fraction
@@ -134,6 +168,9 @@ class Line:
     @property
     def length(self):
         return np.sqrt((self.p1.x - self.p2.x) ** 2 + (self.p1.y - self.p2.y) ** 2)
+
+    def plot(self, ax, **kwargs):
+        ax.plot([self.p1.x, self.p2.x], [self.p1.y, self.p2.y], **kwargs)
 
 
 @dataclass

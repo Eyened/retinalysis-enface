@@ -21,6 +21,14 @@ def open_mask(fpath):
     return np.array(im)
 
 
+def open_binary_mask(fpath):
+    im = open_mask(fpath)
+    if len(im.shape) == 2:
+        return (im > 0).astype(np.uint8).squeeze()
+    else:
+        return im[:, :, 0].squeeze()
+
+
 def open_image_pil(path: Union[Path, str]):
     if isinstance(path, str):
         path = Path(path)
