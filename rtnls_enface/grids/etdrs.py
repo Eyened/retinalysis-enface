@@ -1,31 +1,60 @@
+from __future__ import annotations
+
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 import numpy as np
+from matplotlib.patches import Circle
 from skimage import measure
 
+from rtnls_enface.base import Laterality
 
-class ETDRSGrid:
+from .base import Grid, GridField
+
+if TYPE_CHECKING:
+    from rtnls_enface.fundus import Fundus
+
+
+class ETDRSField(GridField):
+    @staticmethod
+    def grid():
+        return ETDRSGrid
+
+
+class Subfield(ETDRSField):
+    CSF = "CSF"
+    SIM = "SIM"
+    NIM = "NIM"
+    TIM = "TIM"
+    IIM = "IIM"
+    SOM = "SOM"
+    NOM = "NOM"
+    TOM = "TOM"
+    IOM = "IOM"
+
+
+class Ring(ETDRSField):
+    Center = "center"
+    Inner = "inner"
+    Outer = "outer"
+
+
+class Quadrant(ETDRSField):
+    Superior = "superior_grid"
+    Nasal = "nasal_grid"
+    Inferior = "inferior_grid"
+    Temporal = "temporal_grid"
+
+
+class ETDRSGrid(Grid):
     subfields_9 = "CSF", "SIM", "NIM", "TIM", "IIM", "SOM", "NOM", "TOM", "IOM"
     rings_3 = "center", "inner", "outer"
     quadrants = "superior_grid", "nasal_grid", "inferior_grid", "temporal_grid"
     all_fields = tuple([*subfields_9, *rings_3, *quadrants, "total"])
 
-    def __init__(self, h, w, fovea_x, fovea_y, resolution, laterality):
-        """
-        h: height of the image
-        w: width of the image
-        fovea_x: x coordinate of the fovea
-        fovea_y: y coordinate of the fovea
-        resolution: resolution of the image in mm/pix
-        laterality: laterality of the eye, 'R' or 'L'
-        """
-        self.h = h
-        self.w = w
-        self.fovea_x = fovea_x
-        self.fovea_y = fovea_y
-
-        self.resolution = resolution
-        self.laterality = laterality
+    def __init__(self, retina: Fundus, multiplier=1.5):
+        super().__init__(retina)
+        self.multiplier = multiplier
 
     def calculate_area(self, binary_image):
         return binary_image.sum() * self.resolution**2
@@ -68,15 +97,17 @@ class ETDRSGrid:
 
     @cached_property
     def center(self):
-        return self.distance_to_fovea < 1
+        return self.distance_to_fovea < 0.5 * self.multiplier
 
     @cached_property
     def inner(self):
-        return (self.distance_to_fovea < 3) & ~self.center
+        return (self.distance_to_fovea < 1.5 * self.multiplier) & ~self.center
 
     @cached_property
     def outer(self):
-        return (self.distance_to_fovea < 6) & ~(self.center | self.inner)
+        return (self.distance_to_fovea < 3 * self.multiplier) & ~(
+            self.center | self.inner
+        )
 
     @cached_property
     def grid(self):
@@ -102,11 +133,11 @@ class ETDRSGrid:
 
     @cached_property
     def nasal(self):
-        return self.right if self.laterality == "R" else self.left
+        return self.right if self.laterality == Laterality.R else self.left
 
     @cached_property
     def temporal(self):
-        return self.left if self.laterality == "R" else self.right
+        return self.left if self.laterality == Laterality.R else self.right
 
     """quadrants grid"""
 
@@ -164,58 +195,48 @@ class ETDRSGrid:
     def IOM(self):
         return self.inferior & self.outer
 
-    def create_svg(self, text_dict):
-        d_inner = np.sqrt((5**2) / 2)
-        d_outer = np.sqrt((30**2) / 2)
-
-        stroke_width = 0.2
-        if self.laterality == "R":
-            # nasal right, temporal left
-            translate = str.maketrans({"N": "R", "T": "L"})
-        else:
-            # nasal left, temporal right
-            translate = str.maketrans({"T": "R", "N": "L"})
-        text_query = {k.translate(translate): v for k, v in text_dict.items()}
-
-        def svg_element(element, **kwargs):
-            attr = " ".join(f'{k}="{v}"' for k, v in kwargs.items())
-            return f"<{element} {attr} />"
-
-        def svg_text(x, y, text):
-            return f'<text x="{x}" y="{y}" fill="black" font-family="Verdana" font-size="4" text-anchor="middle" dominant-baseline="middle">{text}</text>'
-
-        text_coordinates = [
-            (30, 30, text_query.get("CSF", "CSF")),
-            (30, 40, text_query.get("IIM", "IIM")),
-            (30, 20, text_query.get("SIM", "SIM")),
-            (20, 30, text_query.get("LIM", "LIM")),
-            (40, 30, text_query.get("RIM", "RIM")),
-            (30, 52.5, text_query.get("IOM", "IOM")),
-            (30, 7.5, text_query.get("SOM", "SOM")),
-            (7.5, 30, text_query.get("LOM", "LOM")),
-            (52.5, 30, text_query.get("ROM", "ROM")),
-        ]
-
-        svg_texts = "\n".join(svg_text(x, y, text) for (x, y, text) in text_coordinates)
-
-        svg_data = f"""
-        <svg width="240" height="240" viewBox="0 0 {2*30} {2*30}" xmlns="http://www.w3.org/2000/svg">
-            <style>
-                circle, line {{
-                    stroke-width: {stroke_width};
-                }}
-            </style>
-            {svg_element('circle', cx=30, cy=30, r=30, stroke="black", fill="none")}
-            {svg_element('circle', cx=30, cy=30, r=15, stroke="black", fill="none")}
-            {svg_element('circle', cx=30, cy=30, r=5, stroke="black", fill="none")}
-            {svg_element('line', x1=30-d_inner, y1=30-d_inner, x2=30-d_outer, y2=30-d_outer, stroke="black")}
-            {svg_element('line', x1=30+d_inner, y1=30-d_inner, x2=30+d_outer, y2=30-d_outer, stroke="black")}
-            {svg_element('line', x1=30-d_inner, y1=30+d_inner, x2=30-d_outer, y2=30+d_outer, stroke="black")}
-            {svg_element('line', x1=30+d_inner, y1=30+d_inner, x2=30+d_outer, y2=30+d_outer, stroke="black")}
-            
-            {svg_texts}
-        
-        </svg>
+    def plot(self, ax, field: GridField = None):
         """
+        Plot the ETDRS grid regions using white lines to draw circles and lines.
 
-        return svg_data
+        Parameters:
+        - ax: matplotlib axes object to plot on
+        - field: Optional ETDRSField to highlight
+        """
+        # Plot circles
+        for radius in [0.5, 1.5, 3]:
+            circle = Circle(
+                (self.fovea_x, self.fovea_y),
+                radius * self.multiplier / self.resolution,
+                fill=False,
+                edgecolor="white",
+                linestyle="-",
+                linewidth=1,
+            )
+            ax.add_artist(circle)
+
+        # Plot lines
+        for angle in [45, 135, 225, 315]:
+            x = [
+                self.fovea_x,
+                self.fovea_x
+                + 3 * self.multiplier * np.cos(np.radians(angle)) / self.resolution,
+            ]
+            y = [
+                self.fovea_y,
+                self.fovea_y
+                + 3 * self.multiplier * np.sin(np.radians(angle)) / self.resolution,
+            ]
+            ax.plot(x, y, color="white", linestyle="-", linewidth=1)
+
+        # Highlight specific field if provided
+        if field is not None:
+            mask = getattr(self, field.value)
+            highlighted = np.ma.masked_where(~mask, np.ones_like(mask))
+            ax.imshow(
+                highlighted, cmap="gray", alpha=0.2, extent=[0, self.w, self.h, 0]
+            )
+
+        ax.set_xlim(0, self.w)
+        ax.set_ylim(self.h, 0)
+        ax.axis("off")

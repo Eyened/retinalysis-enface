@@ -33,8 +33,8 @@ def plot_grid(plot_fn, nrows=4, ncols=4):
         plot_fn(ax=ax, row=row, col=col)
 
 
-def plot_rows(plot_fn, nrows=4, ncols=2):
-    fig = plt.figure(figsize=(nrows * 4, ncols * 4), dpi=300)
+def plot_rows(plot_fn, nrows=4, ncols=2, dpi=300):
+    fig = plt.figure(figsize=(nrows * 4.096, ncols * 4.096), dpi=dpi)
     axs = ImageGrid(
         fig,
         111,  # similar to subplot(111)

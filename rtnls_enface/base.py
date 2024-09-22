@@ -239,3 +239,8 @@ class Ellipse:
 
 BinaryImage = np.ndarray
 PixelGraph = Dict[TuplePoint, Set[TuplePoint]]
+
+
+class Laterality(Enum):
+    R = 0
+    L = 1
