@@ -60,7 +60,8 @@ class Grid(ABC):
         return field[p[0], p[1]]
 
     def fraction_in_field(self, points: List[TuplePoint], field: GridField):
-        return np.mean([self.point_in_field(p, field) for p in points])
+        field = self.field(field)
+        return np.mean([field[p[0], p[1]] for p in points])
 
     def plot(self, ax, field: GridField = None):
         raise NotImplementedError()

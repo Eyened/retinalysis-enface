@@ -52,7 +52,7 @@ class ETDRSGrid(Grid):
     quadrants = "superior_grid", "nasal_grid", "inferior_grid", "temporal_grid"
     all_fields = tuple([*subfields_9, *rings_3, *quadrants, "total"])
 
-    def __init__(self, retina: Fundus, multiplier=1.5):
+    def __init__(self, retina: Fundus, multiplier=1):
         super().__init__(retina)
         self.multiplier = multiplier
 
