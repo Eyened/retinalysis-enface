@@ -128,45 +128,19 @@ class FundusLoader(PairedFileLoader):
             )
 
     @classmethod
-    def from_paths(cls, disc_paths, fundus_paths, fovea_locations_path, meta_path):
-        if disc_paths is None and fundus_paths is None:
-            raise ValueError("Either disc_paths or fundus_paths must be provided")
-        (disc_paths, fundus_paths), stems = cls._get_items_from_files(
-            disc_paths, fundus_paths
-        )
-        fovea_locations = cls._read_fovea_locations(fovea_locations_path, stems)
-        metadata = cls._add_meta(meta_path, stems)
-        return cls(disc_paths, fundus_paths, fovea_locations, metadata, stems)
-
-    @classmethod
-    def _read_folders(
+    def from_folders(
         cls,
         discs_folder: Union[str, Path] = None,
         fundus_folder: Union[str, Path] = None,
         fovea_locations_path: Union[str, Path] = None,
         meta_path: Union[str, Path] = None,
     ):
-        # either disc or fundus must be available'
-
-        (disc_paths, fundus_paths), stems = cls._get_items_from_folders(
-            discs_folder, fundus_folder
+        items = cls._get_items_from_folders(
+            disc_path=discs_folder, fundus_path=fundus_folder
         )
-        fovea_locations = cls._read_fovea_locations(fovea_locations_path, stems)
-        metadata = cls._add_meta(meta_path, stems)
-        return stems, disc_paths, fundus_paths, fovea_locations, metadata
-
-    @classmethod
-    def from_folders(
-        cls,
-        discs_folder: Union[str, Path] = None,
-        fundus_folder: Union[str, Path] = None,
-        path_to_fovea_locations_df: Union[str, Path] = None,
-        meta_path: str = None,
-    ):
-        stems, disc_paths, fundus_paths, fovea_locations, metadata = cls._read_folders(
-            discs_folder, fundus_folder, path_to_fovea_locations_df, meta_path
-        )
-        return cls(disc_paths, fundus_paths, fovea_locations, metadata, ids=stems)
+        cls._add_fovea_locations(items, fovea_locations_path)
+        cls._add_meta(items, meta_path)
+        return cls(items)
 
     @classmethod
     def from_folder(
@@ -178,17 +152,22 @@ class FundusLoader(PairedFileLoader):
         fovea_locations_csv: str = "fovea.csv",
     ):
         base = Path(base_folder)
-        meta_csv = base / meta_csv if meta_csv is not None else None
-        if meta_csv is not None and not os.path.exists(meta_csv):
-            warnings.warn(f"file {meta_csv} not found")
-        fovea_locations_csv = (
+        meta_path = base / meta_csv if meta_csv is not None else None
+        fovea_locations_path = (
             base / fovea_locations_csv if fovea_locations_csv is not None else None
         )
-        if fovea_locations_csv is not None and not os.path.exists(fovea_locations_csv):
-            warnings.warn(f"file {fovea_locations_csv} not found")
+
+        for path in [meta_path, fovea_locations_path]:
+            if path is not None and not os.path.exists(path):
+                warnings.warn(f"File {path} not found")
+
         return cls.from_folders(
-            base / discs_subfolder if discs_subfolder is not None else None,
-            base / fundus_subfolder if fundus_subfolder is not None else None,
-            fovea_locations_csv,
-            meta_csv,
+            discs_folder=base / discs_subfolder
+            if discs_subfolder is not None
+            else None,
+            fundus_folder=base / fundus_subfolder
+            if fundus_subfolder is not None
+            else None,
+            fovea_locations_path=fovea_locations_path,
+            meta_path=meta_path,
         )

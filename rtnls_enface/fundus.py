@@ -2,20 +2,25 @@ from __future__ import annotations
 
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Type, TypeVar, Union
 
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
-from rtnls_enface.base import EnfaceImage, Layer, Point
+from rtnls_enface.base import EnfaceImage, Laterality, Layer, Point
 from rtnls_enface.disc import OpticDisc
+from rtnls_enface.grids.base import Grid
+from rtnls_enface.grids.etdrs import ETDRSGrid
 from rtnls_enface.utils.data_loading import open_binary_mask, open_mask
 from rtnls_enface.utils.image import match_resolution
 
 if TYPE_CHECKING:
     from rtnls_fundusprep.mask_extraction import Bounds
+
+
+GridClass = TypeVar("T", bound=Grid)
 
 
 class Fundus(EnfaceImage):
@@ -26,6 +31,7 @@ class Fundus(EnfaceImage):
         layers: Dict[str, Layer] = None,
         fovea_location: Tuple[float, float] = None,
         bounds: Bounds = None,
+        grids: List[Type[GridClass]] = [ETDRSGrid],  # list of grid classes
         scaling_factor=1.0,
         resolution=(1024, 1024),
         id: Any = None,
@@ -47,6 +53,11 @@ class Fundus(EnfaceImage):
         )
         self.bounds = bounds
         self.scaling_factor = scaling_factor
+        # self.grids holds a mapping GridClass -> GridObject
+        if self.disc is not None and self.fovea_location is not None:
+            self.grids = {cls: cls(self) for cls in grids}
+        else:
+            self.grids = {}
 
     def zone(self, zone_name):
         layers = {
@@ -88,6 +99,14 @@ class Fundus(EnfaceImage):
         return self.disc.center_of_mass.distance_to(self.fovea_location)
 
     @cached_property
+    def laterality(self):
+        if self.disc is None or self.fovea_location is None:
+            return None
+        if self.disc.center_of_mass.x < self.fovea_location.x:
+            return Laterality.L
+        return Laterality.R
+
+    @cached_property
     def mask(self) -> np.ndarray:
         if self.bounds is None:
             raise ValueError("Bounds not set")
@@ -110,27 +129,15 @@ class Fundus(EnfaceImage):
             return None
         return self.disc.closest_point(self.fovea_location)
 
-    def plot_fundus(self, ax=None, fig=None):
+    def plot(self, layers=None, disc=True, fovea=True, ax=None, **kwargs):
         if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
-            ax.set_axis_off()
-
-        if self.fundus_image is None:
-            return
-
-        ax.imshow(self.fundus_image)
-
-        return fig, ax
-
-    def plot(self, layers=None, ax=None, fig=None, disc=True, fovea=True):
-        plt.ioff()
-        if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
+            fig, ax = plt.subplots(1, 1, figsize=(8, 8), dpi=300)
+            ax.imshow(np.zeros(self.image.shape))
             ax.set_axis_off()
 
         if self.image is not None:
-            cfi = self.image
-            ax.imshow(cfi)
+            ax.imshow(self.image)
+
         colors = [(0, 0, 0, 0), (1, 1, 1, 1)]
         cmap = LinearSegmentedColormap.from_list("binary", colors, N=2)
 
@@ -140,7 +147,7 @@ class Fundus(EnfaceImage):
             layers = self.layers
 
         for k, l in layers.items():
-            l.plot(ax, fig)
+            l.plot(ax=ax, **kwargs)
 
         if self.fovea_location is not None and fovea:
             ax.scatter(
@@ -153,7 +160,7 @@ class Fundus(EnfaceImage):
         if self.disc is not None and disc:
             ax.imshow(self.disc.mask, cmap=cmap)
 
-        return fig, ax
+        return ax
 
     @classmethod
     def from_file(
