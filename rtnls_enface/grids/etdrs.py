@@ -20,6 +20,8 @@ class ETDRSField(GridField):
     def grid():
         return ETDRSGrid
 
+class MiscField(ETDRSField):
+    Total = 'total'
 
 class Subfield(ETDRSField):
     CSF = "CSF"
@@ -94,7 +96,6 @@ class ETDRSGrid(Grid):
         return np.ones((self.h, self.w), dtype=bool)
 
     """rings"""
-
     @cached_property
     def center(self):
         return self.distance_to_fovea < 0.5 * self.multiplier
@@ -114,7 +115,6 @@ class ETDRSGrid(Grid):
         return self.center | self.inner | self.outer
 
     """quadrants"""
-
     @cached_property
     def inferior(self):
         return (1 / 8 < self.theta) & (self.theta <= 3 / 8)
@@ -140,7 +140,6 @@ class ETDRSGrid(Grid):
         return self.left if self.laterality == Laterality.R else self.right
 
     """quadrants grid"""
-
     @cached_property
     def superior_grid(self):
         return self.superior & self.grid
@@ -158,7 +157,6 @@ class ETDRSGrid(Grid):
         return self.temporal & self.grid
 
     """subfields"""
-
     @cached_property
     def CSF(self):
         return self.center
