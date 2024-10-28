@@ -39,6 +39,7 @@ class Fundus(EnfaceImage):
         image = self._load_fundus_image(fundus_path_or_mask)
         super().__init__(image, id)
 
+        self.name = 'image'
         self.resolution = resolution
         self.load_disc(disc_path_or_mask)
 
@@ -55,7 +56,13 @@ class Fundus(EnfaceImage):
         self.scaling_factor = scaling_factor
         # self.grids holds a mapping GridClass -> GridObject
         if self.disc is not None and self.fovea_location is not None:
-            self.grids = {cls: cls(self) for cls in grids}
+            self.grids = {
+                cls: cls(
+                    self, 
+                    resolution=4.75/self.disc_fovea_distance,
+                    mask=self.bounds.make_binary_mask() if self.bounds is not None else None
+                ) for cls in grids
+            }
         else:
             self.grids = {}
 

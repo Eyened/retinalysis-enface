@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from functools import cached_property
 import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Union
 
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
@@ -41,9 +43,30 @@ class FAZ:
         self.mask = mask
         self.faz_enface = faz_enface
 
-    @property
-    def diameter(self):
-        return 2 * self.radius
+    
+    @cached_property
+    def area(self):
+        return np.sum(self.mask)
+    
+    @cached_property
+    def contour_image(self):
+        # Find contours in the binary mask
+        contours, _ = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Create a blank image (same size as binary mask) to draw contours on
+        contour_image = np.zeros_like(self.mask)
+        
+        # Draw contours on the blank image
+        cv2.drawContours(contour_image, contours, -1, (255), thickness=1)  # Use 255 for white contours
+        
+        return contour_image
+
+    @cached_property
+    def perimeter_length(self):
+        # Find contours in the binary mask
+        contours, _ = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Calculate the perimeter for each contour and sum them
+        return sum(cv2.arcLength(contour, True) for contour in contours)
 
     def distance_to_center(self, point: TuplePoint):
         return distance.euclidean(self.center_of_mass.tuple, point)
@@ -67,21 +90,6 @@ class FAZ:
         # Return the closest blob point
         p = blob_points[closest_point_index]
         return Point(p[0], p[1])
-
-    def plot(self, ax=None, fig=None):
-        if ax is None:
-            if self.fundus is not None:
-                fig, ax = self.fundus.plot_fundus()
-            else:
-                fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
-                ax.set_axis_off()
-
-        im = self.mask
-        cmap = plt.get_cmap("binary")
-        cmap.set_bad((0, 0, 0, 0))
-        masked = np.ma.masked_where(im == 0, im)
-        ax.imshow(masked, cmap=cmap, interpolation="nearest")
-        return fig, ax
 
     @classmethod
     def from_file(cls, fpath: Union[str, Path]):

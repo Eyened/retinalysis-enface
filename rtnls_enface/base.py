@@ -22,10 +22,11 @@ class EnfaceImage(ABC):
     ):
         self.image = image
         self.id = id
+        self.resolution = tuple(image.shape[:2])
 
     def plot_image(self, ax=None, fig=None):
         if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
+            _, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
             ax.set_axis_off()
 
         if self.image is None:
@@ -33,7 +34,7 @@ class EnfaceImage(ABC):
 
         ax.imshow(self.image)
 
-        return fig, ax
+        return ax
 
     @classmethod
     @abstractmethod

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from matplotlib.patches import Circle
+
 from skimage import measure
 
 from rtnls_enface.base import Laterality
@@ -13,6 +14,7 @@ from .base import Grid, GridField
 
 if TYPE_CHECKING:
     from rtnls_enface.fundus import Fundus
+    from rtnls_enface.faz_enface import FAZEnface
 
 
 class ETDRSField(GridField):
@@ -54,8 +56,11 @@ class ETDRSGrid(Grid):
     quadrants = "superior_grid", "nasal_grid", "inferior_grid", "temporal_grid"
     all_fields = tuple([*subfields_9, *rings_3, *quadrants, "total"])
 
-    def __init__(self, retina: Fundus, multiplier=1):
-        super().__init__(retina)
+    def __init__(self, retina: Fundus | FAZEnface, resolution, mask, multiplier=1):
+        super().__init__(retina, resolution, mask)
+        self.fovea_x = retina.fovea_location.x
+        self.fovea_y = retina.fovea_location.y
+        self.laterality = retina.laterality
         self.multiplier = multiplier
 
     def calculate_area(self, binary_image):
@@ -133,10 +138,14 @@ class ETDRSGrid(Grid):
 
     @cached_property
     def nasal(self):
+        if self.laterality is None:
+            raise RuntimeError(f'nasal() called in ETDRSGrid and laterality not known')
         return self.right if self.laterality == Laterality.R else self.left
 
     @cached_property
     def temporal(self):
+        if self.laterality is None:
+            raise RuntimeError(f'temporal() called in ETDRSGrid and laterality not known')
         return self.left if self.laterality == Laterality.R else self.right
 
     """quadrants grid"""

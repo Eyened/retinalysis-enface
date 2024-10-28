@@ -150,21 +150,6 @@ class OpticDisc:
         p = blob_points[closest_point_index]
         return Point(p[0], p[1])
 
-    def plot(self, ax=None, fig=None):
-        if ax is None:
-            if self.fundus is not None:
-                fig, ax = self.fundus.plot_fundus()
-            else:
-                fig, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
-                ax.set_axis_off()
-
-        im = self.mask
-        cmap = plt.get_cmap("binary")
-        cmap.set_bad((0, 0, 0, 0))
-        masked = np.ma.masked_where(im == 0, im)
-        ax.imshow(masked, cmap=cmap, interpolation="nearest")
-        return fig, ax
-
     @classmethod
     def from_file(cls, fpath: Union[str, Path]):
         im = open_mask(fpath)

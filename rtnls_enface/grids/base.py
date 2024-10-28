@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, List
 
 import numpy as np
 
-from rtnls_enface.base import Point, TuplePoint
+from rtnls_enface.base import EnfaceImage, Point, TuplePoint
 
 if TYPE_CHECKING:
     from rtnls_enface.fundus import Fundus
@@ -23,7 +23,7 @@ class GridField(Enum):
 
 
 class Grid(ABC):
-    def __init__(self, retina: Fundus):
+    def __init__(self, image: EnfaceImage, resolution, mask=None):
         """
         h: height of the image
         w: width of the image
@@ -32,19 +32,9 @@ class Grid(ABC):
         resolution: resolution of the image in mm/pix
         laterality: laterality of the eye, 'R' or 'L'
         """
-        # self.h = retina.bounds.h
-        # self.w = retina.bounds.w
-        self.w = retina.resolution[0]
-        self.h = retina.resolution[1]
-        self.fovea_x = retina.fovea_location.x
-        self.fovea_y = retina.fovea_location.y
-
-        self.resolution = 4.75 / retina.disc_fovea_distance
-        self.laterality = retina.laterality
-
-        self.mask = (
-            retina.bounds.make_binary_mask() if retina.bounds is not None else None
-        )
+        self.h, self.w = image.resolution
+        self.resolution = resolution
+        self.mask = mask
 
     def field(self, field: GridField) -> np.ndarray:
         return getattr(self, field.value)
