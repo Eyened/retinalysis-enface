@@ -59,6 +59,9 @@ class Fundus(EnfaceImage):
         else:
             self.grids = {}
 
+    def get_layers(self, layer_type):
+        return [layer for layer in self.layers.values() if isinstance(layer, layer_type)]
+
     def zone(self, zone_name):
         layers = {
             key: Layer(val.extract_zone(zone_name), self)
