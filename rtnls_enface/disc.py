@@ -28,7 +28,7 @@ class OpticDisc:
         labeled_array, num_features = ndimage.label(mask)
 
         if num_features == 0:
-            warnings.warn("Found no connected components for disc mask. ")
+            raise RuntimeError("Found no connected components for disc mask.")
         elif num_features >= 2:
             warnings.warn("Found more than one connected component for disc mask. ")
             # Find the size of each connected component

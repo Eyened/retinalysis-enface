@@ -47,7 +47,7 @@ class FAZEnface(EnfaceImage):
     def fovea_location(self) -> Point:
         return self.faz.center_of_mass if self. faz is not None else None
 
-    def plot(self, layers=None, ax=None, fig=None, disc=True, fovea=True):
+    def plot(self, layers=None, ax=None, fig=None, faz=True):
         if ax is None:
             _, ax = plt.subplots(1, 1, figsize=(4, 4), dpi=300)
             ax.set_axis_off()
@@ -65,7 +65,7 @@ class FAZEnface(EnfaceImage):
         for k, l in layers.items():
             l.plot(ax, fig)
 
-        if self.faz is not None and disc:
+        if self.faz is not None and faz:
             ax.imshow(self.faz.mask, cmap=cmap)
 
         return ax

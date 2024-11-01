@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from matplotlib.patches import Circle
-
 from skimage import measure
 
 from rtnls_enface.base import Laterality
@@ -13,8 +12,8 @@ from rtnls_enface.base import Laterality
 from .base import Grid, GridField
 
 if TYPE_CHECKING:
-    from rtnls_enface.fundus import Fundus
     from rtnls_enface.faz_enface import FAZEnface
+    from rtnls_enface.fundus import Fundus
 
 
 class ETDRSField(GridField):
@@ -22,8 +21,10 @@ class ETDRSField(GridField):
     def grid():
         return ETDRSGrid
 
+
 class MiscField(ETDRSField):
-    Total = 'total'
+    Total = "total"
+
 
 class Subfield(ETDRSField):
     CSF = "CSF"
@@ -44,16 +45,25 @@ class Ring(ETDRSField):
 
 
 class Quadrant(ETDRSField):
-    Superior = "superior_grid"
-    Nasal = "nasal_grid"
-    Inferior = "inferior_grid"
-    Temporal = "temporal_grid"
+    Superior = "quadrant_superior"
+    Inferior = "quadrant_inferior"
+    Nasal = "quadrant_nasal"
+    Temporal = "quadrant_temporal"
+    Right = "quadrant_right"
+    Left = "quadrant_left"
 
 
 class ETDRSGrid(Grid):
     subfields_9 = "CSF", "SIM", "NIM", "TIM", "IIM", "SOM", "NOM", "TOM", "IOM"
     rings_3 = "center", "inner", "outer"
-    quadrants = "superior_grid", "nasal_grid", "inferior_grid", "temporal_grid"
+    quadrants = (
+        "quadrant_superior",
+        "quadrant_nasal",
+        "quadrant_inferior",
+        "quadrant_temporal",
+        "quadrant_right",
+        "quadrant_left",
+    )
     all_fields = tuple([*subfields_9, *rings_3, *quadrants, "total"])
 
     def __init__(self, retina: Fundus | FAZEnface, resolution, mask, multiplier=1):
@@ -101,6 +111,7 @@ class ETDRSGrid(Grid):
         return np.ones((self.h, self.w), dtype=bool)
 
     """rings"""
+
     @cached_property
     def center(self):
         return self.distance_to_fovea < 0.5 * self.multiplier
@@ -120,6 +131,7 @@ class ETDRSGrid(Grid):
         return self.center | self.inner | self.outer
 
     """quadrants"""
+
     @cached_property
     def inferior(self):
         return (1 / 8 < self.theta) & (self.theta <= 3 / 8)
@@ -139,33 +151,45 @@ class ETDRSGrid(Grid):
     @cached_property
     def nasal(self):
         if self.laterality is None:
-            raise RuntimeError(f'nasal() called in ETDRSGrid and laterality not known')
+            raise RuntimeError("nasal() called in ETDRSGrid and laterality not known")
         return self.right if self.laterality == Laterality.R else self.left
 
     @cached_property
     def temporal(self):
         if self.laterality is None:
-            raise RuntimeError(f'temporal() called in ETDRSGrid and laterality not known')
+            raise RuntimeError(
+                "temporal() called in ETDRSGrid and laterality not known"
+            )
         return self.left if self.laterality == Laterality.R else self.right
 
     """quadrants grid"""
+
     @cached_property
-    def superior_grid(self):
+    def quadrant_superior(self):
         return self.superior & self.grid
 
     @cached_property
-    def nasal_grid(self):
-        return self.nasal & self.grid
-
-    @cached_property
-    def inferior_grid(self):
+    def quadrant_inferior(self):
         return self.inferior & self.grid
 
     @cached_property
-    def temporal_grid(self):
+    def quadrant_nasal(self):
+        return self.nasal & self.grid
+
+    @cached_property
+    def quadrant_temporal(self):
         return self.temporal & self.grid
 
+    @cached_property
+    def quadrant_left(self):
+        return self.left & self.grid
+
+    @cached_property
+    def quadrant_right(self):
+        return self.right & self.grid
+
     """subfields"""
+
     @cached_property
     def CSF(self):
         return self.center

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Union
 import pandas as pd
 
 from rtnls_enface.fundus import Fundus
-from rtnls_fundusprep.mask_extraction import Bounds
+from rtnls_fundusprep.cfi_bounds import CFIBounds as Bounds
 
 
 class PairedFileLoader:
