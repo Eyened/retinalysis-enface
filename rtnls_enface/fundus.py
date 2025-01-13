@@ -142,7 +142,7 @@ class Fundus(EnfaceImage):
     def plot(self, layers=None, disc=True, fovea=True, ax=None, **kwargs):
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(8, 8), dpi=300)
-            ax.imshow(np.zeros(self.image.shape))
+            ax.imshow(np.zeros(self.resolution))
             ax.set_axis_off()
 
         if self.image is not None:

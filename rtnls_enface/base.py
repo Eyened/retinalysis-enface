@@ -22,7 +22,8 @@ class EnfaceImage(ABC):
     ):
         self.image = image
         self.id = id
-        self.resolution = tuple(image.shape[:2])
+        if image is not None:
+            self.resolution = tuple(image.shape[:2])
 
     def plot_image(self, ax=None, fig=None):
         if ax is None:

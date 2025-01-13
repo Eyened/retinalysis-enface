@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Union
 import pandas as pd
 
 from rtnls_enface.fundus import Fundus
-from rtnls_fundusprep.mask_extraction import Bounds
+from rtnls_fundusprep.cfi_bounds import CFIBounds
 
 
 class PairedFileLoader:
@@ -91,12 +91,13 @@ class PairedFileLoader:
 
 
 class FundusLoader(PairedFileLoader):
+    # load an object
     def get_item(self, id):
         item = self.items[id]
-        if "metadata" in item:
-            bounds = Bounds(**item["metadata"])
-            M = bounds.get_cropping_matrix(1024)
-            item["bounds"] = bounds.warp(M, (1024, 1024))
+        if "bounds" in item:
+            bounds = CFIBounds(**item["bounds"])
+            M = bounds.get_cropping_transform(1024)
+            item["bounds"] = bounds.warp(M)
         return item
 
     def make_object(self, id):
@@ -110,7 +111,16 @@ class FundusLoader(PairedFileLoader):
         metadata.index = metadata.index.astype(str)
 
         for id, item in items.items():
-            item["metadata"] = metadata.loc[id].to_dict()
+            if id not in metadata.index:
+                raise ValueError(f"ID {id} not found in metadata")
+            success = metadata.loc[id, "success"]
+            if not success:
+                item["bounds"] = None
+                warnings.warn(
+                    f"ID {id} metadata has success=False. Bounds set to None."
+                )
+            else:
+                item["bounds"] = eval(metadata.loc[id, "bounds"])
 
     @classmethod
     def _add_fovea_locations(
