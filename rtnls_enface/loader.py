@@ -50,6 +50,10 @@ class PairedFileLoader:
     def to_dict(self):
         return list(self.items.values())
 
+    def filter(self, filter_fn):
+        self.items = {k: v for k, v in self.items.items() if filter_fn(v)}
+        self.indices = list(self.items.keys())
+
     @classmethod
     def _get_items_from_files(
         cls, **file_lists: Dict[str, List[str | Path]]

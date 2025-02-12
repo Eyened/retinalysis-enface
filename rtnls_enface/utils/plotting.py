@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from math import ceil
 from typing import List
 
@@ -76,7 +77,7 @@ def plot_grid(plot_fn, nrows=4, ncols=4, dpi=300):
     for i, ax in enumerate(axs):
         row = i // ncols
         col = i % ncols
-        plot_fn(ax=ax, row=row, col=col)
+        plot_fn(ax=ax, row=row, col=col, i=i)
 
 
 def plot_rows(plot_fn, nrows=4, ncols=2, dpi=300):
@@ -109,3 +110,34 @@ def plot_columns(plot_fn, nrows=4, ncols=2, dpi=300):
     for i in range(ncols):
         plot_fn(axs=[axs[row * ncols + i] for row in range(nrows)], col=i, fig=fig)
     return fig, axs
+
+
+@contextmanager
+def mpl_grid(nrows, ncols, figsize=(15, 10), dpi=150):
+    """
+    Context manager that creates a Matplotlib grid and provides a flattened array of axes for easy plotting.
+
+    Args:
+        rows (int): Number of rows in the grid.
+        cols (int): Number of columns in the grid.
+        figsize (tuple): Size of the figure (width, height).
+
+    Yields:
+        fig (matplotlib.figure.Figure): The created figure.
+        axes (np.ndarray): Flattened array of axes for easy access by index.
+    """
+    fig = plt.figure(dpi=dpi, figsize=figsize)
+    axes = ImageGrid(
+        fig,
+        111,  # similar to subplot(111)
+        nrows_ncols=(nrows, ncols),  # creates 2x2 grid of axes
+        axes_pad=0.1,  # pad between axes in inch.
+        share_all=True,
+        aspect=False,
+    )
+    # axes = axes.flatten()  # Flatten the axes array for 1D indexing
+    try:
+        yield fig, axes
+    finally:
+        plt.tight_layout()
+        plt.show()

@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, List, Union
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy import ndimage
 from scipy.spatial import distance
@@ -28,7 +27,8 @@ class OpticDisc:
         labeled_array, num_features = ndimage.label(mask)
 
         if num_features == 0:
-            raise RuntimeError("Found no connected components for disc mask.")
+            pass
+            # raise RuntimeError("Found no connected components for disc mask.")
         elif num_features >= 2:
             warnings.warn("Found more than one connected component for disc mask. ")
             # Find the size of each connected component

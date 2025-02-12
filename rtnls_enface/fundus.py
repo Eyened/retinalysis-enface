@@ -17,7 +17,7 @@ from rtnls_enface.utils.data_loading import open_binary_mask, open_mask
 from rtnls_enface.utils.image import match_resolution
 
 if TYPE_CHECKING:
-    from rtnls_fundusprep.mask_extraction import Bounds
+    from rtnls_fundusprep.mask_extraction import CFIBounds as Bounds
 
 
 GridClass = TypeVar("T", bound=Grid)
@@ -39,7 +39,7 @@ class Fundus(EnfaceImage):
         image = self._load_fundus_image(fundus_path_or_mask)
         super().__init__(image, id)
 
-        self.name = 'image'
+        self.name = "image"
         self.resolution = resolution
         self.load_disc(disc_path_or_mask)
 
@@ -58,16 +58,32 @@ class Fundus(EnfaceImage):
         if self.disc is not None and self.fovea_location is not None:
             self.grids = {
                 cls: cls(
-                    self, 
-                    resolution=4.75/self.disc_fovea_distance,
-                    mask=self.bounds.make_binary_mask() if self.bounds is not None else None
-                ) for cls in grids
+                    self,
+                    resolution=4.75 / self.disc_fovea_distance,
+                    mask=self.bounds.make_binary_mask()
+                    if self.bounds is not None
+                    else None,
+                )
+                for cls in grids
             }
         else:
             self.grids = {}
 
+    @cached_property
+    def grayscale(self) -> np.ndarray:
+        return np.dot(self.image[..., :3], [0.299, 0.587, 0.114]).astype(np.uint8)
+
+    @cached_property
+    def contrast_enhanced(self) -> np.ndarray:
+        if self.bounds is None:
+            raise RuntimeError("Bounds must be set for contrast enhancing")
+        im = self.bounds.make_contrast_enhanced_res256(self.image)
+        return np.dot(im, [0.299, 0.587, 0.114]).astype(np.uint8)
+
     def get_layers(self, layer_type):
-        return [layer for layer in self.layers.values() if isinstance(layer, layer_type)]
+        return [
+            layer for layer in self.layers.values() if isinstance(layer, layer_type)
+        ]
 
     def zone(self, zone_name):
         layers = {
@@ -151,10 +167,12 @@ class Fundus(EnfaceImage):
         colors = [(0, 0, 0, 0), (1, 1, 1, 1)]
         cmap = LinearSegmentedColormap.from_list("binary", colors, N=2)
 
-        if layers is not None:
+        if isinstance(layers, list):
             layers = {l: self.layers[l] for l in layers}
-        else:
+        elif layers:
             layers = self.layers
+        else:
+            layers = {}
 
         for k, l in layers.items():
             l.plot(ax=ax, **kwargs)
