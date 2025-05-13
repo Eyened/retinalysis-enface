@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Union
 import pandas as pd
 
 from rtnls_enface.fundus import Fundus
-from rtnls_fundusprep.cfi_bounds import CFIBounds
 
 
 class PairedFileLoader:
@@ -97,6 +96,8 @@ class PairedFileLoader:
 class FundusLoader(PairedFileLoader):
     # load an object
     def get_item(self, id):
+        from rtnls_fundusprep.cfi_bounds import CFIBounds
+
         item = self.items[id]
         if "bounds" in item:
             bounds = CFIBounds(**item["bounds"])
