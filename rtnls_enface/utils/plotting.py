@@ -79,16 +79,24 @@ def plot_grid(plot_fn, nrows=4, ncols=4, dpi=300):
         col = i % ncols
         plot_fn(ax=ax, row=row, col=col, i=i)
 
+    return fig, axs
 
-def plot_rows(plot_fn, nrows=4, ncols=2, dpi=300):
-    fig = plt.figure(figsize=(nrows * 4.096, ncols * 4.096), dpi=dpi)
-    axs = ImageGrid(
-        fig,
-        111,  # similar to subplot(111)
-        nrows_ncols=(nrows, ncols),  # creates 2x2 grid of axes
-        axes_pad=0.1,  # pad between axes in inch.
-        share_all=True,
-    )
+
+def plot_rows(plot_fn, nrows=4, ncols=2, dpi=300, subplots=False):
+    if subplots:
+        fig, axs = plt.subplots(
+            nrows, ncols, figsize=(nrows * 4.096, ncols * 4.096), dpi=dpi
+        )
+        axs = axs.flat
+    else:
+        fig = plt.figure(figsize=(nrows * 4.096, ncols * 4.096), dpi=dpi)
+        axs = ImageGrid(
+            fig,
+            111,  # similar to subplot(111)
+            nrows_ncols=(nrows, ncols),  # creates 2x2 grid of axes
+            axes_pad=0.1,  # pad between axes in inch.
+            share_all=True,
+        )
     for i in range(nrows):
         plot_fn(axs=axs[i * ncols : (i + 1) * ncols], row=i, fig=fig)
     return fig, axs

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Type, TypeVar, Union
@@ -10,7 +11,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
 from rtnls_enface.base import EnfaceImage, Laterality, Layer, Point
-from rtnls_enface.disc import OpticDisc
+from rtnls_enface.disc import InvalidDiscMaskException, OpticDisc
 from rtnls_enface.grids.base import Grid
 from rtnls_enface.grids.etdrs import ETDRSGrid
 from rtnls_enface.utils.data_loading import open_binary_mask, open_mask
@@ -116,7 +117,11 @@ class Fundus(EnfaceImage):
             disc_mask = match_resolution(
                 disc_mask, self.resolution, interpolation=cv2.INTER_NEAREST
             )
-            self.disc = OpticDisc(disc_mask, fundus=self)
+            try:
+                self.disc = OpticDisc(disc_mask, fundus=self)
+            except InvalidDiscMaskException:
+                warnings.warn(f"Invalid disc mask. Setting disc to None")
+                self.disc = None
 
     @cached_property
     def disc_fovea_distance(self):
@@ -169,10 +174,10 @@ class Fundus(EnfaceImage):
 
         if isinstance(layers, list):
             layers = {l: self.layers[l] for l in layers}
-        elif layers:
-            layers = self.layers
-        else:
+        elif layers is False:
             layers = {}
+        else:
+            layers = self.layers
 
         for k, l in layers.items():
             l.plot(ax=ax, **kwargs)
@@ -181,8 +186,9 @@ class Fundus(EnfaceImage):
             ax.scatter(
                 x=self.fovea_location.tuple[1],
                 y=self.fovea_location.tuple[0],
-                c="green",
-                s=2,
+                c="white",
+                marker="x",
+                s=8,
             )
 
         if self.disc is not None and disc:

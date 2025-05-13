@@ -10,6 +10,8 @@ class GeneralQCValidator(FundusQCValidator):
     """
 
     def __call__(self, fundus: Fundus):
+        if fundus.disc is None or fundus.bounds is None:
+            return False
         if fundus.disc.num_ccs != 1:
             return False
         dist = fundus.disc.distance_to_bounds_2()
