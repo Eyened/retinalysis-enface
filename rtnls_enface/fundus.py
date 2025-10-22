@@ -14,6 +14,8 @@ from rtnls_enface.base import EnfaceImage, Laterality, Layer, Point
 from rtnls_enface.disc import InvalidDiscMaskException, OpticDisc
 from rtnls_enface.grids.base import Grid
 from rtnls_enface.grids.etdrs import ETDRSGrid
+from rtnls_enface.grids.ellipse import EllipseGrid
+from rtnls_enface.grids.circle import CircleGrid
 from rtnls_enface.utils.data_loading import open_binary_mask, open_mask
 from rtnls_enface.utils.image import match_resolution
 
@@ -32,7 +34,7 @@ class Fundus(EnfaceImage):
         layers: Dict[str, Layer] = None,
         fovea_location: Tuple[float, float] = None,
         bounds: Bounds = None,
-        grids: List[Type[GridClass]] = [ETDRSGrid],  # list of grid classes
+        grids: List[Type[GridClass]] = [ETDRSGrid, EllipseGrid, CircleGrid],  # list of grid classes
         scaling_factor=1.0,
         resolution=(1024, 1024),
         id: Any = None,

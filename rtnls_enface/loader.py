@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Union
 
 import pandas as pd
+import numpy as np
 
 from rtnls_enface.fundus import Fundus
 
@@ -98,11 +99,22 @@ class FundusLoader(PairedFileLoader):
     def get_item(self, id):
         from rtnls_fundusprep.cfi_bounds import CFIBounds
 
-        item = self.items[id]
-        if "bounds" in item:
-            bounds = CFIBounds(**item["bounds"])
-            M = bounds.get_cropping_transform(1024)
-            item["bounds"] = bounds.warp(M)
+        # work on a copy to avoid mutating internal state
+        item = dict(self.items[id])
+
+        b = item.get("bounds", None)
+        if b is not None:
+            if isinstance(b, CFIBounds):
+                bounds = b
+            elif isinstance(b, dict):
+                bounds = CFIBounds(**b)
+            else:
+                bounds = None
+
+            if bounds is not None:
+                M = bounds.get_cropping_transform(1024)
+                item["bounds"] = bounds.warp(M)
+
         return item
 
     def make_object(self, id):

@@ -9,14 +9,14 @@ from skimage import measure
 
 from rtnls_enface.base import Laterality
 
-from .base import Grid, GridField
+from .base import Grid, GridFieldEnum, GridField
 
 if TYPE_CHECKING:
     from rtnls_enface.faz_enface import FAZEnface
     from rtnls_enface.fundus import Fundus
 
 
-class ETDRSField(GridField):
+class ETDRSField(GridFieldEnum):
     @staticmethod
     def grid():
         return ETDRSGrid
@@ -226,7 +226,7 @@ class ETDRSGrid(Grid):
     def IOM(self):
         return self.inferior & self.outer
 
-    def plot(self, ax, field: GridField = None):
+    def plot(self, ax, field: GridFieldEnum | GridField = None):
         """
         Plot the ETDRS grid regions using white lines to draw circles and lines.
 
@@ -262,7 +262,8 @@ class ETDRSGrid(Grid):
 
         # Highlight specific field if provided
         if field is not None:
-            mask = getattr(self, field.value)
+            enum = field.enum if isinstance(field, GridField) else field
+            mask = getattr(self, enum.value)
             highlighted = np.ma.masked_where(~mask, np.ones_like(mask))
             ax.imshow(
                 highlighted, cmap="gray", alpha=0.2, extent=[0, self.w, self.h, 0]
@@ -271,3 +272,6 @@ class ETDRSGrid(Grid):
         ax.set_xlim(0, self.w)
         ax.set_ylim(self.h, 0)
         ax.axis("off")
+
+    # Link enum type to grid
+    FieldEnum = ETDRSField
