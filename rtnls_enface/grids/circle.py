@@ -19,7 +19,7 @@ class CircleField(GridFieldEnum):
 
     Superior = "superior"
     Inferior = "inferior"
-    Grid = "grid"
+    FullGrid = "grid"
 
     @staticmethod
     def grid():
@@ -107,7 +107,7 @@ class CircleGrid(Grid):
             radius=self._r,
             fill=False,
             edgecolor="white",
-            linewidth=1,
+            linewidth=0.5,
         )
         ax.add_artist(patch)
 
@@ -117,7 +117,7 @@ class CircleGrid(Grid):
         y1 = self._center.y - self._r * s
         x2 = self._center.x + self._r * c
         y2 = self._center.y + self._r * s
-        ax.plot([x1, x2], [y1, y2], color="white", linestyle="-", linewidth=1)
+        ax.plot([x1, x2], [y1, y2], color="white", linestyle="-", linewidth=0.5)
 
         # Highlight a specific field
         if field is not None:
@@ -126,7 +126,7 @@ class CircleGrid(Grid):
             highlighted = np.ma.masked_where(~mask, np.ones_like(mask))
             ax.imshow(
                 highlighted,
-                cmap="gray",
+                cmap="Greys_r",
                 alpha=0.2,
                 extent=[0, self.w, self.h, 0],
             )

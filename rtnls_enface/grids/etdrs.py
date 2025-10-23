@@ -22,11 +22,7 @@ class ETDRSField(GridFieldEnum):
         return ETDRSGrid
 
 
-class MiscField(ETDRSField):
-    Total = "total"
-
-
-class Subfield(ETDRSField):
+class ETDRSSubfield(ETDRSField):
     CSF = "CSF"
     SIM = "SIM"
     NIM = "NIM"
@@ -38,13 +34,14 @@ class Subfield(ETDRSField):
     IOM = "IOM"
 
 
-class Ring(ETDRSField):
+class ETDRSRing(ETDRSField):
+    FullGrid = "grid"
     Center = "center"
     Inner = "inner"
     Outer = "outer"
 
 
-class Quadrant(ETDRSField):
+class ETDRSQuadrant(ETDRSField):
     Superior = "quadrant_superior"
     Inferior = "quadrant_inferior"
     Nasal = "quadrant_nasal"
@@ -54,18 +51,6 @@ class Quadrant(ETDRSField):
 
 
 class ETDRSGrid(Grid):
-    subfields_9 = "CSF", "SIM", "NIM", "TIM", "IIM", "SOM", "NOM", "TOM", "IOM"
-    rings_3 = "center", "inner", "outer"
-    quadrants = (
-        "quadrant_superior",
-        "quadrant_nasal",
-        "quadrant_inferior",
-        "quadrant_temporal",
-        "quadrant_right",
-        "quadrant_left",
-    )
-    all_fields = tuple([*subfields_9, *rings_3, *quadrants, "total"])
-
     def __init__(self, retina: Fundus | FAZEnface, resolution, mask, multiplier=1):
         super().__init__(retina, resolution, mask)
         self.fovea_x = retina.fovea_location.x
@@ -242,7 +227,7 @@ class ETDRSGrid(Grid):
                 fill=False,
                 edgecolor="white",
                 linestyle="-",
-                linewidth=1,
+                linewidth=0.5,
             )
             ax.add_artist(circle)
 
@@ -258,7 +243,7 @@ class ETDRSGrid(Grid):
                 self.fovea_y
                 + 3 * self.multiplier * np.sin(np.radians(angle)) / self.resolution,
             ]
-            ax.plot(x, y, color="white", linestyle="-", linewidth=1)
+            ax.plot(x, y, color="white", linestyle="-", linewidth=0.5)
 
         # Highlight specific field if provided
         if field is not None:

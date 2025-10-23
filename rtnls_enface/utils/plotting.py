@@ -61,7 +61,7 @@ def plot_gridfns(plot_fns: List[None], ncols=4):
         fn(ax=axs[i])
 
 
-def plot_grid(plot_fn, nrows=4, ncols=4, dpi=300):
+def plot_grid(plot_fn, nrows=4, ncols=4, dpi=100):
     fig = plt.figure(figsize=(nrows * 4, ncols * 4), dpi=dpi)
     axs = ImageGrid(
         fig,

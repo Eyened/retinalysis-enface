@@ -18,7 +18,7 @@ class HemifieldField(GridFieldEnum):
 
     Superior = "superior"
     Inferior = "inferior"
-    Grid = "grid"
+    FullGrid = "grid"
 
     @staticmethod
     def grid():
@@ -101,7 +101,7 @@ class HemifieldGrid(Grid):
         y1 = self._center.y - length * s
         x2 = self._center.x + length * c
         y2 = self._center.y + length * s
-        ax.plot([x1, x2], [y1, y2], color="white", linestyle="-", linewidth=1)
+        ax.plot([x1, x2], [y1, y2], color="white", linestyle="-", linewidth=0.5)
 
         # Highlight a specific field
         if field is not None:

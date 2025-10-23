@@ -105,3 +105,6 @@ class GridField:
     @property
     def mask(self) -> np.ndarray:
         return getattr(self._grid, self._enum.value)
+
+    def plot(self, ax):
+        self._grid.plot(ax, self._enum)

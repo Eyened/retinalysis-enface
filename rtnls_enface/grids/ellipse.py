@@ -19,7 +19,8 @@ class EllipseField(GridFieldEnum):
 
     Superior = "superior"
     Inferior = "inferior"
-
+    FullGrid = "grid"
+    
     @staticmethod
     def grid():
         return EllipseGrid
@@ -120,7 +121,7 @@ class EllipseGrid(Grid):
             angle=self._angle_deg,
             fill=False,
             edgecolor="white",
-            linewidth=1,
+            linewidth=0.5,
         )
         ax.add_artist(patch)
 
@@ -130,7 +131,7 @@ class EllipseGrid(Grid):
         y1 = self._center.y - self._a * s
         x2 = self._center.x + self._a * c
         y2 = self._center.y + self._a * s
-        ax.plot([x1, x2], [y1, y2], color="white", linestyle="-", linewidth=1)
+        ax.plot([x1, x2], [y1, y2], color="white", linestyle="-", linewidth=0.5)
 
         # Highlight a specific field
         if field is not None:
