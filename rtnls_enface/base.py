@@ -229,6 +229,9 @@ class Circle:
         ) ** 0.5
         return distance <= self.r
 
+    def resize(self, r: float):
+        """Return a new circle with the specified radius"""
+        return Circle(center=self.center, r=self.r + r, retina=self.retina)
 
 @dataclass
 class Ellipse:

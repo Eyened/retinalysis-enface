@@ -159,7 +159,7 @@ class Fundus(EnfaceImage):
             return None
         return self.disc.closest_point(self.fovea_location)
 
-    def plot(self, layers=None, disc=True, fovea=True, ax=None, **kwargs):
+    def plot(self, ax=None, image=True, disc=False, fovea=False, bounds=False,  **kwargs):
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(8, 8), dpi=300)
             ax.imshow(np.zeros(self.resolution))
@@ -168,18 +168,10 @@ class Fundus(EnfaceImage):
         if self.image is not None:
             ax.imshow(self.image)
 
-        colors = [(0, 0, 0, 0), (1, 1, 1, 1)]
-        cmap = LinearSegmentedColormap.from_list("binary", colors, N=2)
+        
 
-        if isinstance(layers, list):
-            layers = {l: self.layers[l] for l in layers}
-        elif layers is False:
-            layers = {}
-        else:
-            layers = self.layers
-
-        for k, l in layers.items():
-            l.plot(ax=ax, **kwargs)
+        if image:
+            ax.imshow(self.image)
 
         if self.fovea_location is not None and fovea:
             ax.scatter(
@@ -191,7 +183,19 @@ class Fundus(EnfaceImage):
             )
 
         if self.disc is not None and disc:
+            colors = [(0, 0, 0, 0), (1, 1, 1, 1)]
+            cmap = LinearSegmentedColormap.from_list("binary", colors, N=2)
             ax.imshow(self.disc.mask, cmap=cmap)
+
+        if self.bounds is not None and bounds:
+            ax.scatter(self.bounds.cx, self.bounds.cy, c="w", s=2)
+            ax.add_artist(
+                plt.Circle((self.bounds.cx, self.bounds.cy), self.bounds.radius, fill=False, color="w")
+            )
+            for k in ["top", "bottom", "left", "right"]:
+                if k in self.bounds.lines:
+                    p0, p1 = self.bounds.lines[k]
+                    ax.plot([p0[0], p1[0]], [p0[1], p1[1]], c="w")
 
         return ax
 
