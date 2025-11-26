@@ -3,7 +3,16 @@ from __future__ import annotations
 import warnings
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Type, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import cv2
 import numpy as np
@@ -12,7 +21,24 @@ from matplotlib.colors import LinearSegmentedColormap
 
 from rtnls_enface.base import EnfaceImage, Laterality, Layer, Point
 from rtnls_enface.disc import InvalidDiscMaskException, OpticDisc
-from rtnls_enface.grids import (Grid, ETDRSGrid, EllipseGrid, CircleGrid, DiscCenteredGrid, HemifieldGrid)
+from rtnls_enface.grids import (
+    CircleGrid,
+    DiscCenteredGrid,
+    EllipseGrid,
+    ETDRSGrid,
+    Grid,
+    GridField,
+    HemifieldGrid,
+)
+from rtnls_enface.grids.specifications import (
+    BaseGridFieldSpecification,
+    BaseGridSpecification,
+    CircleGridSpecification,
+    DiscCenteredGridSpecification,
+    EllipseGridSpecification,
+    ETDRSGridSpecification,
+    HemifieldGridSpecification,
+)
 from rtnls_enface.utils.data_loading import open_binary_mask, open_mask
 from rtnls_enface.utils.image import match_resolution
 
@@ -21,6 +47,22 @@ if TYPE_CHECKING:
 
 
 GridClass = TypeVar("T", bound=Grid)
+
+_DEFAULT_GRID_CLASSES: Tuple[Type[Grid], ...] = (
+    ETDRSGrid,
+    EllipseGrid,
+    CircleGrid,
+    DiscCenteredGrid,
+    HemifieldGrid,
+)
+
+_DEFAULT_SPEC_BY_GRID: Dict[Type[Grid], BaseGridSpecification] = {
+    ETDRSGrid: ETDRSGridSpecification(),
+    EllipseGrid: EllipseGridSpecification(),
+    CircleGrid: CircleGridSpecification(),
+    DiscCenteredGrid: DiscCenteredGridSpecification(),
+    HemifieldGrid: HemifieldGridSpecification(),
+}
 
 
 class Fundus(EnfaceImage):
@@ -31,7 +73,6 @@ class Fundus(EnfaceImage):
         layers: Dict[str, Layer] = None,
         fovea_location: Tuple[float, float] = None,
         bounds: Bounds = None,
-        grids: List[Type[GridClass]] = [ETDRSGrid, EllipseGrid, CircleGrid, DiscCenteredGrid, HemifieldGrid],  # list of grid classes
         scaling_factor=1.0,
         resolution=(1024, 1024),
         id: Any = None,
@@ -54,20 +95,7 @@ class Fundus(EnfaceImage):
         )
         self.bounds = bounds
         self.scaling_factor = scaling_factor
-        # self.grids holds a mapping GridClass -> GridObject
-        if self.disc is not None and self.fovea_location is not None:
-            self.grids = {
-                cls: cls(
-                    self,
-                    resolution=4.75 / self.disc_fovea_distance,
-                    mask=self.bounds.make_binary_mask()
-                    if self.bounds is not None
-                    else None,
-                )
-                for cls in grids
-            }
-        else:
-            self.grids = {}
+        self._grid_cache: Dict[BaseGridSpecification, Grid] = {}
 
     @cached_property
     def grayscale(self) -> np.ndarray:
@@ -119,7 +147,7 @@ class Fundus(EnfaceImage):
             try:
                 self.disc = OpticDisc(disc_mask, fundus=self)
             except InvalidDiscMaskException:
-                warnings.warn(f"Invalid disc mask. Setting disc to None")
+                warnings.warn("Invalid disc mask. Setting disc to None")
                 self.disc = None
 
     @cached_property
@@ -159,7 +187,9 @@ class Fundus(EnfaceImage):
             return None
         return self.disc.closest_point(self.fovea_location)
 
-    def plot(self, ax=None, image=True, disc=False, fovea=False, bounds=False,  **kwargs):
+    def plot(
+        self, ax=None, image=True, disc=False, fovea=False, bounds=False, **kwargs
+    ):
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(8, 8), dpi=300)
             ax.imshow(np.zeros(self.resolution))
@@ -167,8 +197,6 @@ class Fundus(EnfaceImage):
 
         if self.image is not None:
             ax.imshow(self.image)
-
-        
 
         if image:
             ax.imshow(self.image)
@@ -190,7 +218,13 @@ class Fundus(EnfaceImage):
         if self.bounds is not None and bounds:
             ax.scatter(self.bounds.cx, self.bounds.cy, c="w", s=2)
             ax.add_artist(
-                plt.Circle((self.bounds.cx, self.bounds.cy), self.bounds.radius, fill=False, color="w")
+                plt.Circle(
+                    (self.bounds.cx, self.bounds.cy),
+                    self.bounds.radius,
+                    fill=False,
+                    color="w",
+                    linewidth=0.5,
+                )
             )
             for k in ["top", "bottom", "left", "right"]:
                 if k in self.bounds.lines:
@@ -220,3 +254,31 @@ class Fundus(EnfaceImage):
         )
 
         return retina
+
+    def _grid_resolution(self) -> float:
+        if self.disc is None or self.fovea_location is None:
+            raise RuntimeError("Cannot build grids without disc and fovea information")
+        return 4.75 / self.disc_fovea_distance
+
+    def _grid_mask(self):
+        if self.bounds is None:
+            return None
+        return self.mask
+
+    def get_grid(self, spec: BaseGridSpecification[GridClass]) -> GridClass:
+        """Return (and cache) a grid instance for the provided specification."""
+        grid = self._grid_cache.get(spec)
+        if grid is None:
+            grid = spec.grid_cls(
+                self,
+                resolution=self._grid_resolution(),
+                mask=self._grid_mask(),
+                **spec.init_kwargs(),
+            )
+            self._grid_cache[spec] = grid
+        return cast(GridClass, grid)
+
+    def get_grid_field(self, field_spec: BaseGridFieldSpecification) -> GridField:
+        """Instantiate the requested grid field using its specification."""
+        grid = self.get_grid(field_spec.grid_spec)
+        return grid.field(field_spec.field)

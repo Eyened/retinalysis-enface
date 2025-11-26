@@ -9,7 +9,7 @@ from skimage import measure
 
 from rtnls_enface.base import Laterality
 
-from .base import Grid, GridFieldEnum, GridField
+from .base import Grid, GridField, GridFieldEnum
 
 if TYPE_CHECKING:
     from rtnls_enface.fundus import Fundus
@@ -39,12 +39,13 @@ class DiscCenteredQuadrant(DiscCenteredField):
 
 
 class DiscCenteredGrid(Grid):
-    def __init__(self, retina: Fundus, resolution, mask):
+    def __init__(self, retina: Fundus, resolution, mask, multiplier=1):
         super().__init__(retina, resolution, mask)
         # Anchor at disc center
         self.disc_cx = retina.disc.circle.center.x
         self.disc_cy = retina.disc.circle.center.y
         self.laterality = retina.laterality
+        self.multiplier = multiplier
         # Physical distances (mm)
         self._odfd = self.resolution * retina.disc_fovea_distance
         self._disc_radius_mm = self.resolution * retina.disc.circle.r
@@ -97,20 +98,20 @@ class DiscCenteredGrid(Grid):
 
     @cached_property
     def center(self):
-        lower = self.disc_radius_mm + 0.2 * self.odfd
-        upper = self.disc_radius_mm + 0.4 * self.odfd
+        lower = self.disc_radius_mm + 0.2 * self.multiplier * self.odfd
+        upper = self.disc_radius_mm + 0.4 * self.multiplier * self.odfd
         return (lower <= self.distance_to_disc) & (self.distance_to_disc < upper)
 
     @cached_property
     def inner(self):
         lower = self.disc_radius_mm
-        upper = self.disc_radius_mm + 0.2 * self.odfd
+        upper = self.disc_radius_mm + 0.2 * self.multiplier * self.odfd
         return (lower <= self.distance_to_disc) & (self.distance_to_disc < upper)
 
     @cached_property
     def outer(self):
-        lower = self.disc_radius_mm + 0.4 * self.odfd
-        upper = self.disc_radius_mm + 0.6 * self.odfd
+        lower = self.disc_radius_mm + 0.4 * self.multiplier * self.odfd
+        upper = self.disc_radius_mm + 0.6 * self.multiplier * self.odfd
         return (lower <= self.distance_to_disc) & (self.distance_to_disc < upper)
 
     @cached_property
@@ -138,7 +139,9 @@ class DiscCenteredGrid(Grid):
     @cached_property
     def nasal(self):
         if self.laterality is None:
-            raise RuntimeError("nasal() called in DiscCenteredGrid and laterality not known")
+            raise RuntimeError(
+                "nasal() called in DiscCenteredGrid and laterality not known"
+            )
         return self.right if self.laterality == Laterality.R else self.left
 
     @cached_property
@@ -182,9 +185,9 @@ class DiscCenteredGrid(Grid):
         # Circles at boundary radii (in pixels):
         radii_mm = [
             self.disc_radius_mm,
-            self.disc_radius_mm + 0.2 * self.odfd,
-            self.disc_radius_mm + 0.4 * self.odfd,
-            self.disc_radius_mm + 0.6 * self.odfd,
+            self.disc_radius_mm + 0.2 * self.multiplier * self.odfd,
+            self.disc_radius_mm + 0.4 * self.multiplier * self.odfd,
+            self.disc_radius_mm + 0.6 * self.multiplier * self.odfd,
         ]
         for r_mm in radii_mm:
             r_px = r_mm / self.resolution
@@ -202,11 +205,17 @@ class DiscCenteredGrid(Grid):
         for angle in [45, 135, 225, 315]:
             x = [
                 self.disc_cx,
-                self.disc_cx +  (self.disc_radius_mm + 0.6 * self.odfd) * np.cos(np.radians(angle)) / self.resolution,
+                self.disc_cx
+                + (self.disc_radius_mm + 0.6 * self.multiplier * self.odfd)
+                * np.cos(np.radians(angle))
+                / self.resolution,
             ]
             y = [
                 self.disc_cy,
-                self.disc_cy + (self.disc_radius_mm + 0.6 * self.odfd) * np.sin(np.radians(angle)) / self.resolution,
+                self.disc_cy
+                + (self.disc_radius_mm + 0.6 * self.multiplier * self.odfd)
+                * np.sin(np.radians(angle))
+                / self.resolution,
             ]
             ax.plot(x, y, color="white", linestyle="-", linewidth=0.5)
 
@@ -215,7 +224,9 @@ class DiscCenteredGrid(Grid):
             enum = field.enum if isinstance(field, GridField) else field
             mask = getattr(self, enum.value)
             highlighted = np.ma.masked_where(~mask, np.ones_like(mask))
-            ax.imshow(highlighted, cmap="gray", alpha=0.2, extent=[0, self.w, self.h, 0])
+            ax.imshow(
+                highlighted, cmap="gray", alpha=0.2, extent=[0, self.w, self.h, 0]
+            )
 
         ax.set_xlim(0, self.w)
         ax.set_ylim(self.h, 0)
@@ -223,5 +234,3 @@ class DiscCenteredGrid(Grid):
 
     # Link enum type to grid
     FieldEnum = DiscCenteredField
-
-
