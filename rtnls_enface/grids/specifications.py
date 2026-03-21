@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generic, Type, TypeVar
+from typing import ClassVar, Generic, Type, TypeVar
 
 from rtnls_enface.grids.base import Grid, GridFieldEnum
 from rtnls_enface.grids.circle import CircleGrid
@@ -17,6 +17,9 @@ FieldEnumT = TypeVar("FieldEnumT", bound=GridFieldEnum)
 
 class BaseGridSpecification(ABC, Generic[GridT]):
     """Base class for immutable grid hyper-parameter specifications."""
+
+    name: ClassVar[str]
+    display_name: ClassVar[str] = ""
 
     @property
     @abstractmethod
@@ -33,6 +36,8 @@ class BaseGridSpecification(ABC, Generic[GridT]):
 class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
     """Hyper-parameters for ETDRS grids."""
 
+    name: ClassVar[str] = "etdrs"
+    display_name: ClassVar[str] = "ETDRS"
     multiplier: float = 1.0
 
     @property
@@ -47,6 +52,8 @@ class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
 class CircleGridSpecification(BaseGridSpecification[CircleGrid]):
     """Hyper-parameters for OD–fovea circle grids."""
 
+    name: ClassVar[str] = "crcl"
+    display_name: ClassVar[str] = "Circle"
     multiplier: float = 1.0
 
     @property
@@ -61,6 +68,8 @@ class CircleGridSpecification(BaseGridSpecification[CircleGrid]):
 class EllipseGridSpecification(BaseGridSpecification[EllipseGrid]):
     """Hyper-parameters for OD–fovea ellipse grids."""
 
+    name: ClassVar[str] = "elps"
+    display_name: ClassVar[str] = "Ellipse"
     multiplier: float = 1.0
 
     @property
@@ -75,6 +84,8 @@ class EllipseGridSpecification(BaseGridSpecification[EllipseGrid]):
 class DiscCenteredGridSpecification(BaseGridSpecification[DiscCenteredGrid]):
     """Hyper-parameters for disc-centered grids."""
 
+    name: ClassVar[str] = "disc"
+    display_name: ClassVar[str] = "Disc"
     multiplier: float = 1.0
 
     @property
@@ -88,6 +99,9 @@ class DiscCenteredGridSpecification(BaseGridSpecification[DiscCenteredGrid]):
 @dataclass(frozen=True, slots=True)
 class HemifieldGridSpecification(BaseGridSpecification[HemifieldGrid]):
     """Hyper-parameters for hemifield grids (currently parameter-free)."""
+
+    name: ClassVar[str] = "hf"
+    display_name: ClassVar[str] = "Hemifield"
 
     @property
     def grid_cls(self) -> Type[HemifieldGrid]:
