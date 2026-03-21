@@ -32,7 +32,7 @@ class BaseGridSpecification(ABC, Generic[GridT]):
         return {}
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
     """Hyper-parameters for ETDRS grids."""
 
@@ -48,7 +48,7 @@ class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
         return {"multiplier": self.multiplier}
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class CircleGridSpecification(BaseGridSpecification[CircleGrid]):
     """Hyper-parameters for OD–fovea circle grids."""
 
@@ -64,7 +64,7 @@ class CircleGridSpecification(BaseGridSpecification[CircleGrid]):
         return {"multiplier": self.multiplier}
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class EllipseGridSpecification(BaseGridSpecification[EllipseGrid]):
     """Hyper-parameters for OD–fovea ellipse grids."""
 
@@ -80,7 +80,7 @@ class EllipseGridSpecification(BaseGridSpecification[EllipseGrid]):
         return {"multiplier": self.multiplier}
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class DiscCenteredGridSpecification(BaseGridSpecification[DiscCenteredGrid]):
     """Hyper-parameters for disc-centered grids."""
 
@@ -96,7 +96,7 @@ class DiscCenteredGridSpecification(BaseGridSpecification[DiscCenteredGrid]):
         return {"multiplier": self.multiplier}
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class HemifieldGridSpecification(BaseGridSpecification[HemifieldGrid]):
     """Hyper-parameters for hemifield grids (currently parameter-free)."""
 
@@ -108,7 +108,7 @@ class HemifieldGridSpecification(BaseGridSpecification[HemifieldGrid]):
         return HemifieldGrid
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class BaseGridFieldSpecification(Generic[FieldEnumT]):
     """Base specification bundling a grid spec with a field enum."""
 
@@ -116,7 +116,7 @@ class BaseGridFieldSpecification(Generic[FieldEnumT]):
     field: FieldEnumT
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class GridFieldSpecification(
     BaseGridFieldSpecification[FieldEnumT], Generic[FieldEnumT]
 ):
