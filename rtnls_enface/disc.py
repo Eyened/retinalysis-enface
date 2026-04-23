@@ -28,12 +28,12 @@ class OpticDisc:
 
         if h != w:
             raise ValueError("Optic disc mask is not square")
-        
+
         # Rescale if not the right size
         if h != size:
             # Resize to the required size
             mask = cv2.resize(mask, (size, size), interpolation=cv2.INTER_NEAREST)
-        
+
         # Label each connected component
         mask = ndimage.binary_fill_holes(mask).astype(np.uint8)
         labeled_array, num_features = ndimage.label(mask)
@@ -58,6 +58,30 @@ class OpticDisc:
         self.mask = mask
         self.fundus = fundus
 
+    def _disc_axis_unit_vectors(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return unit vectors for the temporal axis and its superior direction."""
+        if self.fundus is None or self.fundus.fovea_location is None:
+            raise ValueError("Fundus with fovea location must be set for disc side points")
+
+        center = self.center_of_mass
+        fovea = self.fundus.fovea_location
+        axis = np.array([fovea.y - center.y, fovea.x - center.x], dtype=float)
+        norm = np.linalg.norm(axis)
+        if norm == 0:
+            raise ValueError("Fovea location must differ from disc center")
+
+        temporal_unit = axis / norm
+
+        # Image y grows downward, so the superior-pointing perpendicular is (-dx, dy).
+        superior_unit = np.array([-temporal_unit[1], temporal_unit[0]], dtype=float)
+        return temporal_unit, superior_unit
+
+    def _project_disc_side_point(self, direction: np.ndarray) -> Point:
+        """Project a unit direction from the disc center onto the disc boundary."""
+        center = self.center_of_mass
+        offset = direction * float(self.circle.r)
+        return Point(center.y + offset[0], center.x + offset[1])
+
     @cached_property
     def circle(self):
         if self.mask is None:
@@ -80,6 +104,30 @@ class OpticDisc:
 
         radius = np.mean(np.sqrt(np.sum((disc - np.array([cX, cY])) ** 2, axis=1)))
         return Circle(center=Point(cY, cX), r=radius)
+
+    @cached_property
+    def temporal_point(self) -> Point:
+        """Tilt-aware temporal disc boundary point along the OD-fovea axis."""
+        temporal_unit, _ = self._disc_axis_unit_vectors()
+        return self._project_disc_side_point(temporal_unit)
+
+    @cached_property
+    def nasal_point(self) -> Point:
+        """Tilt-aware nasal disc boundary point opposite the OD-fovea axis."""
+        temporal_unit, _ = self._disc_axis_unit_vectors()
+        return self._project_disc_side_point(-temporal_unit)
+
+    @cached_property
+    def superior_point(self) -> Point:
+        """Tilt-aware superior disc boundary point perpendicular to the OD-fovea axis."""
+        _, superior_unit = self._disc_axis_unit_vectors()
+        return self._project_disc_side_point(superior_unit)
+
+    @cached_property
+    def inferior_point(self) -> Point:
+        """Tilt-aware inferior disc boundary point perpendicular to the OD-fovea axis."""
+        _, superior_unit = self._disc_axis_unit_vectors()
+        return self._project_disc_side_point(-superior_unit)
 
     @cached_property
     def bounding_box(self):
@@ -120,25 +168,25 @@ class OpticDisc:
     def get_padded_square_bb(self, padding_percent=10):
         """
         Returns a square bounding box expanded by a percentage of its side.
-        
+
         Parameters:
         - padding_percent: percentage of the side length to pad on each side
-        
+
         Returns:
         - (x0, x1, y0, y1): coordinates of the padded square bounding box
         """
         x0, x1, y0, y1 = self.square_bb
         side = x1 - x0  # Square side length
-        
+
         # Calculate padding amount
         padding = side * (padding_percent / 100)
-        
+
         # Add padding to all sides
         x0_padded = max(0, int(x0 - padding))
         x1_padded = int(x1 + padding)
         y0_padded = max(0, int(y0 - padding))
         y1_padded = int(y1 + padding)
-            
+
         return x0_padded, x1_padded, y0_padded, y1_padded
 
     def distance_to_center(self, point: TuplePoint):
@@ -150,58 +198,32 @@ class OpticDisc:
     def intersects(self, points: List[TuplePoint]) -> bool:
         return any([bool(self.mask[p[0], p[1]]) for p in points])
 
-    def distance_to_bounds(self):
-        # Unpack circle center for clarity
-        x, y = self.fundus.bounds.cx, self.fundus.bounds.cy
-        circle_radius = self.fundus.bounds.radius
-
-        # Generate a grid of coordinates
-        xx, yy = np.meshgrid(
-            np.arange(self.mask.shape[1]), np.arange(self.mask.shape[0])
-        )
-
-        # Calculate distances from each point to the circle's center
-        dist_to_center = np.sqrt((xx - x) ** 2 + (yy - y) ** 2)
-
-        # Calculate distances to the circle's edge
-        dist_to_edge = np.abs(dist_to_center - circle_radius)
-
-        # Mask the distance map with the binary image
-        masked_dist = np.where(self.mask == 1, dist_to_edge, np.inf)
-
-        # Find the minimum distance and its location
-        min_dist_idx = np.unravel_index(np.argmin(masked_dist), masked_dist.shape)
-
-        # Return the location of the closest "on" point and the distance
-        return min_dist_idx, masked_dist[min_dist_idx]
-
-    def distance_to_bounds_2(self):
-        if self.fundus.bounds is None:
-            raise ValueError("Bounds must be set for distance to bounds")
-        cx, cy = self.fundus.bounds.cx, self.fundus.bounds.cy
-        r = self.fundus.bounds.radius
-        # Convert the image to grayscale if it is not already
-        if len(self.mask.shape) == 3:
-            self.mask = cv2.cvtColor(self.mask, cv2.COLOR_BGR2GRAY)
-
-        # Find contours in the image
+    @cached_property
+    def boundary_pixels(self) -> np.ndarray:
+        """Contour pixels of the disc mask used for distance queries."""
         contours, _ = cv2.findContours(
-            self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            self.mask.astype(np.uint8),
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_NONE,
         )
+        if len(contours) == 0:
+            return np.empty((0, 2), dtype=int)
+        contour = np.concatenate(contours, axis=0).reshape(-1, 2)
+        return contour[:, ::-1]
 
-        # Calculate minimum distances
-        min_distances = []
-        for contour in contours:
-            for point in contour:
-                # Extract point coordinates
-                x, y = point.ravel()
-                # Calculate distance from point to the circle center
-                distance_to_center = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-                # Calculate absolute difference between distance to center and radius
-                distance_to_circle = abs(distance_to_center - r)
-                min_distances.append(distance_to_circle)
+    def distance_to_bounds(self):
+        """Return the minimum distance from the disc contour to the ROI boundary."""
+        if self.fundus is None or self.fundus.roi_mask is None:
+            raise ValueError("ROI mask must be set for distance to bounds")
 
-        return np.min(min_distances)
+        boundary_pixels = self.boundary_pixels
+        if boundary_pixels.size == 0:
+            raise ValueError("Disc boundary could not be computed")
+
+        distances = self.fundus.mask_distance_transform[
+            boundary_pixels[:, 0], boundary_pixels[:, 1]
+        ]
+        return float(np.min(distances))
 
     def closest_point(self, point: Point) -> Point:
         # Identify the blob points

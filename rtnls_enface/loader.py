@@ -115,7 +115,8 @@ class FundusLoader(PairedFileLoader):
 
             if bounds is not None:
                 M = bounds.get_cropping_transform(1024)
-                item["bounds"] = bounds.warp(M)
+                item["roi_mask"] = bounds.warp(M).make_binary_mask()
+                item["bounds"] = None
 
         return item
 

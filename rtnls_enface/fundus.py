@@ -68,11 +68,12 @@ _DEFAULT_SPEC_BY_GRID: Dict[Type[Grid], BaseGridSpecification] = {
 class Fundus(EnfaceImage):
     def __init__(
         self,
-        disc_path_or_mask: Union[str, Path, np.array] = None,
-        fundus_path_or_mask: Union[str, Path, np.array] = None,
+        disc_path_or_mask: Union[str, Path, np.ndarray] = None,
+        fundus_path_or_mask: Union[str, Path, np.ndarray] = None,
         layers: Dict[str, Layer] = None,
         fovea_location: Tuple[float, float] = None,
         bounds: Bounds = None,
+        roi_mask: Union[str, Path, np.ndarray] = None,
         scaling_factor=1.0,
         resolution=(1024, 1024),
         id: Any = None,
@@ -82,31 +83,26 @@ class Fundus(EnfaceImage):
 
         self.name = "image"
         self.resolution = resolution
+        self.bounds = None
+        self.roi_mask = self._load_roi_mask(roi_mask, bounds)
         self.load_disc(disc_path_or_mask)
 
         self.layers = layers if layers is not None else dict()
         for layer in self.layers.values():
             layer.retina = self
+            layer.mask = self._clip_mask_to_roi(layer.mask)
 
         self.fovea_location = (
             Point(fovea_location[1], fovea_location[0])
             if fovea_location is not None
             else None
         )
-        self.bounds = bounds
         self.scaling_factor = scaling_factor
         self._grid_cache: Dict[BaseGridSpecification, Grid] = {}
 
     @cached_property
     def grayscale(self) -> np.ndarray:
         return np.dot(self.image[..., :3], [0.299, 0.587, 0.114]).astype(np.uint8)
-
-    @cached_property
-    def contrast_enhanced(self) -> np.ndarray:
-        if self.bounds is None:
-            raise RuntimeError("Bounds must be set for contrast enhancing")
-        im = self.bounds.make_contrast_enhanced_res256(self.image)
-        return np.dot(im, [0.299, 0.587, 0.114]).astype(np.uint8)
 
     def get_layers(self, layer_type):
         return [
@@ -120,7 +116,7 @@ class Fundus(EnfaceImage):
         }
         return Fundus(layers, self.disc_mask, self.fundus_image)
 
-    def _load_fundus_image(self, path_or_array: Union[None, str, np.array]):
+    def _load_fundus_image(self, path_or_array: Union[None, str, np.ndarray]):
         if path_or_array is None:
             return None
         else:
@@ -129,7 +125,45 @@ class Fundus(EnfaceImage):
             else:
                 return open_mask(path_or_array)
 
-    def load_disc(self, path_or_array: Union[None, str, np.array]):
+    def _normalize_binary_mask(
+        self, path_or_array: Union[None, str, Path, np.ndarray]
+    ) -> Union[None, np.ndarray]:
+        if path_or_array is None:
+            return None
+
+        if isinstance(path_or_array, np.ndarray):
+            mask = path_or_array
+        else:
+            mask = open_binary_mask(path_or_array)
+
+        mask = match_resolution(
+            mask.astype(np.uint8),
+            self.resolution,
+            interpolation=cv2.INTER_NEAREST,
+        )
+        return mask.astype(bool)
+
+    def _load_roi_mask(
+        self,
+        roi_mask: Union[None, str, Path, np.ndarray],
+        bounds: Bounds,
+    ) -> Union[None, np.ndarray]:
+        """Load a binary ROI mask, optionally deriving it from legacy bounds."""
+        if roi_mask is not None:
+            return self._normalize_binary_mask(roi_mask)
+        if bounds is not None:
+            return self._normalize_binary_mask(bounds.make_binary_mask())
+        return None
+
+    def _clip_mask_to_roi(self, mask: np.ndarray) -> np.ndarray:
+        """Clip a binary mask to the currently configured ROI mask."""
+        mask_array = np.asarray(mask)
+        if self.roi_mask is None:
+            return mask_array
+        clipped = mask_array.astype(bool) & self.mask
+        return clipped.astype(mask_array.dtype, copy=False)
+
+    def load_disc(self, path_or_array: Union[None, str, np.ndarray]):
         if path_or_array is None:
             self.disc_path = None
             self.disc = None
@@ -144,6 +178,7 @@ class Fundus(EnfaceImage):
             disc_mask = match_resolution(
                 disc_mask, self.resolution, interpolation=cv2.INTER_NEAREST
             )
+            disc_mask = self._clip_mask_to_roi(disc_mask.astype(np.uint8))
             try:
                 self.disc = OpticDisc(disc_mask, fundus=self)
             except InvalidDiscMaskException:
@@ -164,11 +199,16 @@ class Fundus(EnfaceImage):
             return Laterality.L
         return Laterality.R
 
-    @cached_property
+    @property
     def mask(self) -> np.ndarray:
-        if self.bounds is None:
-            raise ValueError("Bounds not set")
-        return self.bounds.make_binary_mask()
+        if self.roi_mask is None:
+            raise ValueError("ROI mask not set")
+        return self.roi_mask
+
+    @cached_property
+    def mask_distance_transform(self) -> np.ndarray:
+        """Distance from each ROI pixel to the nearest out-of-ROI pixel."""
+        return cv2.distanceTransform(self.mask.astype(np.uint8), cv2.DIST_L2, 5)
 
     @cached_property
     def laplacian(self) -> np.ndarray:
@@ -178,9 +218,6 @@ class Fundus(EnfaceImage):
         # Apply the mask to the image
         laplacian[self.mask == 0] = np.nan
         return laplacian
-
-    def set_bounds(self, bounds: Bounds):
-        self.bounds = bounds
 
     def etdrs_point(self) -> Point:
         if self.disc is None or self.fovea_location is None:
@@ -195,10 +232,7 @@ class Fundus(EnfaceImage):
             ax.imshow(np.zeros(self.resolution))
             ax.set_axis_off()
 
-        if self.image is not None:
-            ax.imshow(self.image)
-
-        if image:
+        if image and self.image is not None:
             ax.imshow(self.image)
 
         if self.fovea_location is not None and fovea:
@@ -215,21 +249,13 @@ class Fundus(EnfaceImage):
             cmap = LinearSegmentedColormap.from_list("binary", colors, N=2)
             ax.imshow(self.disc.mask, cmap=cmap)
 
-        if self.bounds is not None and bounds:
-            ax.scatter(self.bounds.cx, self.bounds.cy, c="w", s=2)
-            ax.add_artist(
-                plt.Circle(
-                    (self.bounds.cx, self.bounds.cy),
-                    self.bounds.radius,
-                    fill=False,
-                    color="w",
-                    linewidth=0.5,
-                )
+        if self.roi_mask is not None and bounds:
+            ax.contour(
+                self.mask.astype(float),
+                levels=[0.5],
+                colors="w",
+                linewidths=0.5,
             )
-            for k in ["top", "bottom", "left", "right"]:
-                if k in self.bounds.lines:
-                    p0, p1 = self.bounds.lines[k]
-                    ax.plot([p0[0], p1[0]], [p0[1], p1[1]], c="w")
 
         return ax
 
@@ -240,16 +266,19 @@ class Fundus(EnfaceImage):
         fundus_path: Union[str, Path] = None,
         fovea_location: Tuple[float, float] = None,
         bounds: Bounds = None,
+        roi_mask: Union[str, Path, np.ndarray] = None,
         scaling_factor=1,
         id: Any = None,
         **kwargs,
     ):
+        roi_mask = kwargs.pop("mask", roi_mask)
         retina = cls(
             disc_path_or_mask=disc_path,
             fundus_path_or_mask=fundus_path,
             fovea_location=fovea_location,
             scaling_factor=scaling_factor,
             bounds=bounds,
+            roi_mask=roi_mask,
             id=id,
         )
 
@@ -261,9 +290,7 @@ class Fundus(EnfaceImage):
         return 4.75 / self.disc_fovea_distance
 
     def _grid_mask(self):
-        if self.bounds is None:
-            return None
-        return self.mask
+        return self.roi_mask
 
     def get_grid(self, spec: BaseGridSpecification[GridClass]) -> GridClass:
         """Return (and cache) a grid instance for the provided specification."""
