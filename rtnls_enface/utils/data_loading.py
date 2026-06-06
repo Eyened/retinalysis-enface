@@ -2,8 +2,19 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
-import pydicom
 from PIL import Image
+
+
+def _read_dicom_pixel_array(path: Union[Path, str]):
+    try:
+        import pydicom
+    except ImportError as exc:
+        raise ImportError(
+            "Reading DICOM images requires the optional dependency 'pydicom'. "
+            "Install pydicom, or use PNG/JPEG/TIFF image inputs."
+        ) from exc
+
+    return pydicom.dcmread(str(path)).pixel_array
 
 
 def open_mask(fpath):
@@ -33,8 +44,7 @@ def open_image_pil(path: Union[Path, str]):
     if isinstance(path, str):
         path = Path(path)
     if path.suffix == ".dcm":
-        ds = pydicom.dcmread(str(path))
-        img = Image.fromarray(ds.pixel_array)
+        img = Image.fromarray(_read_dicom_pixel_array(path))
     else:
         img = Image.open(str(path))
     return img
