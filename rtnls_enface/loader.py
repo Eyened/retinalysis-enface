@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Union
 import pandas as pd
 import numpy as np
 
+from rtnls_enface.bounds import make_roi_mask_from_bounds
 from rtnls_enface.fundus import Fundus
 
 
@@ -99,23 +100,14 @@ class PairedFileLoader:
 class FundusLoader(PairedFileLoader):
     # load an object
     def get_item(self, id):
-        from rtnls_fundusprep.cfi_bounds import CFIBounds
-
         # work on a copy to avoid mutating internal state
         item = dict(self.items[id])
 
         b = item.get("bounds", None)
         if b is not None:
-            if isinstance(b, CFIBounds):
-                bounds = b
-            elif isinstance(b, dict):
-                bounds = CFIBounds(**b)
-            else:
-                bounds = None
-
-            if bounds is not None:
-                M = bounds.get_cropping_transform(1024)
-                item["roi_mask"] = bounds.warp(M).make_binary_mask()
+            roi_mask = make_roi_mask_from_bounds(b, target_diameter=1024)
+            if roi_mask is not None:
+                item["roi_mask"] = roi_mask
                 item["bounds"] = None
 
         return item

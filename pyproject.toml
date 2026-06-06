@@ -24,12 +24,15 @@ dependencies = [
     "click>=8,<9",
     "pydicom>=2.4,<4; sys_platform != 'emscripten'",
     "scikit-image>=0.21,<1",
-    "retinalysis-fundusprep",
 ]
 
 [project.optional-dependencies]
+fundusprep = [
+    "retinalysis-fundusprep >= 0.6.1",
+]
 test = [
-    "pytest == 8.*"
+    "pytest == 8.*",
+    "retinalysis-fundusprep >= 0.6.1",
 ]
 
 [tool.setuptools]

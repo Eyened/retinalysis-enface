@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
 from rtnls_enface.base import EnfaceImage, Laterality, Layer, Point
+from rtnls_enface.bounds import make_roi_mask_from_bounds
 from rtnls_enface.disc import InvalidDiscMaskException, OpticDisc
 from rtnls_enface.grids import (
     CircleGrid,
@@ -152,7 +153,9 @@ class Fundus(EnfaceImage):
         if roi_mask is not None:
             return self._normalize_binary_mask(roi_mask)
         if bounds is not None:
-            return self._normalize_binary_mask(bounds.make_binary_mask())
+            mask = make_roi_mask_from_bounds(bounds)
+            if mask is not None:
+                return self._normalize_binary_mask(mask)
         return None
 
     def _clip_mask_to_roi(self, mask: np.ndarray) -> np.ndarray:
