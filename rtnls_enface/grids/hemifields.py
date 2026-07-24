@@ -28,8 +28,8 @@ class HemifieldField(GridFieldEnum):
 class HemifieldGrid(Grid):
     """Simple grid that splits the image into superior/inferior halves.
 
-    The split is defined relative to the optic disc–fovea axis. Masks cover the
-    entire image half-planes (no radial cutoff). The plot draws only the axis line.
+    The split is defined relative to the optic disc–fovea axis and is restricted to
+    the visible retina mask. The plot draws only the axis line.
     """
 
     def __init__(self, retina: Fundus, resolution, mask):
@@ -65,8 +65,8 @@ class HemifieldGrid(Grid):
 
     @cached_property
     def grid(self) -> np.ndarray:
-        """Boolean mask of the full image (all ones)."""
-        return np.ones((self.h, self.w), dtype=bool)
+        """Boolean mask of the visible retina."""
+        return self.retina.mask.astype(bool, copy=False)
 
     @cached_property
     def _perp_unit(self) -> tuple[float, float]:
@@ -83,14 +83,14 @@ class HemifieldGrid(Grid):
         px, py = self._perp_unit
         # Dot < 0 corresponds to superior (y smaller) region in image coords
         dot = self._dx * px + self._dy * py
-        return dot < 0
+        return (dot < 0) & self.retina.mask
 
     @cached_property
     def inferior(self) -> np.ndarray:
         """Boolean mask of the inferior hemifield of the image."""
         px, py = self._perp_unit
         dot = self._dx * px + self._dy * py
-        return ~(dot < 0)
+        return ~(dot < 0) & self.retina.mask
 
     def plot(self, ax, field: HemifieldField | GridField | None = None):
         """Plot only the OD–fovea axis line and optionally highlight a field."""
