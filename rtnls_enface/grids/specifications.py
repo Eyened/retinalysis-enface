@@ -15,11 +15,20 @@ GridT = TypeVar("GridT", bound=Grid)
 FieldEnumT = TypeVar("FieldEnumT", bound=GridFieldEnum)
 
 
+@dataclass(frozen=True)
 class BaseGridSpecification(ABC, Generic[GridT]):
     """Base class for immutable grid hyper-parameter specifications."""
 
-    name: ClassVar[str]
+    # The compact name is an instance-level override so every grid
+    # specification can use it in feature names. Concrete specifications
+    # provide their normal value through ``default_name`` below.
+    name: str = ""
+    default_name: ClassVar[str] = ""
     display_name: ClassVar[str] = ""
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            object.__setattr__(self, "name", self.default_name)
 
     @property
     @abstractmethod
@@ -36,7 +45,7 @@ class BaseGridSpecification(ABC, Generic[GridT]):
 class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
     """Hyper-parameters for ETDRS grids."""
 
-    name: ClassVar[str] = "etdrs"
+    default_name: ClassVar[str] = "etdrs"
     display_name: ClassVar[str] = "ETDRS"
     multiplier: float = 1.0
 
@@ -50,57 +59,74 @@ class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
 
 @dataclass(frozen=True)
 class CircleGridSpecification(BaseGridSpecification[CircleGrid]):
-    """Hyper-parameters for OD–fovea circle grids."""
+    """Hyper-parameters for OD–fovea circle grids.
 
-    name: ClassVar[str] = "crcl"
+    ``name`` is an optional compact token override used when serializing grid
+    specifications into feature names. The option is defined by the base
+    specification and is available consistently on every grid type.
+    """
+
+    default_name: ClassVar[str] = "crcl"
     display_name: ClassVar[str] = "Circle"
     multiplier: float = 1.0
+    band_crop_fraction: float = 0.0
 
     @property
     def grid_cls(self) -> Type[CircleGrid]:
         return CircleGrid
 
     def init_kwargs(self) -> dict[str, object]:
-        return {"multiplier": self.multiplier}
+        return {
+            "multiplier": self.multiplier,
+            "band_crop_fraction": self.band_crop_fraction,
+        }
 
 
 @dataclass(frozen=True)
 class EllipseGridSpecification(BaseGridSpecification[EllipseGrid]):
     """Hyper-parameters for OD–fovea ellipse grids."""
 
-    name: ClassVar[str] = "elps"
+    default_name: ClassVar[str] = "elps"
     display_name: ClassVar[str] = "Ellipse"
     multiplier: float = 1.0
+    band_crop_fraction: float = 0.0
 
     @property
     def grid_cls(self) -> Type[EllipseGrid]:
         return EllipseGrid
 
     def init_kwargs(self) -> dict[str, object]:
-        return {"multiplier": self.multiplier}
+        return {
+            "multiplier": self.multiplier,
+            "band_crop_fraction": self.band_crop_fraction,
+        }
 
 
 @dataclass(frozen=True)
 class DiscCenteredGridSpecification(BaseGridSpecification[DiscCenteredGrid]):
     """Hyper-parameters for disc-centered grids."""
 
-    name: ClassVar[str] = "disc"
+    default_name: ClassVar[str] = "disc"
     display_name: ClassVar[str] = "Disc"
     multiplier: float = 1.0
+    band_crop_fraction: float = 0.0
 
     @property
     def grid_cls(self) -> Type[DiscCenteredGrid]:
         return DiscCenteredGrid
 
     def init_kwargs(self) -> dict[str, object]:
-        return {"multiplier": self.multiplier}
+        return {
+            "multiplier": self.multiplier,
+            "band_crop_fraction": self.band_crop_fraction,
+        }
 
 
 @dataclass(frozen=True)
 class HemifieldGridSpecification(BaseGridSpecification[HemifieldGrid]):
     """Hyper-parameters for hemifield grids (currently parameter-free)."""
 
-    name: ClassVar[str] = "hf"
+    default_name: ClassVar[str] = "hf"
     display_name: ClassVar[str] = "Hemifield"
 
     @property

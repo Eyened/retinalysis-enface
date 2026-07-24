@@ -225,6 +225,17 @@ class OpticDisc:
         ]
         return float(np.min(distances))
 
+    def distance_to_visible_bounds(self) -> float:
+        """Return the minimum distance from the disc contour to ROI or image bounds."""
+        x0, x1, y0, y1 = self.bounding_box
+        h, w = self.mask.shape[:2]
+        image_edge_distance = min(x0, y0, w - 1 - x1, h - 1 - y1)
+
+        if self.fundus is None or self.fundus.roi_mask is None:
+            return float(image_edge_distance)
+
+        return float(min(image_edge_distance, self.distance_to_bounds()))
+
     def closest_point(self, point: Point) -> Point:
         # Identify the blob points
         blob_points = np.argwhere(self.mask > 0)

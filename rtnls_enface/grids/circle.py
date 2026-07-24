@@ -8,7 +8,8 @@ import numpy as np
 from matplotlib.patches import Circle as MplCircle
 
 from rtnls_enface.base import Line
-from .base import Grid, GridFieldEnum, GridField
+
+from .base import Grid, GridField, GridFieldEnum
 
 if TYPE_CHECKING:
     from rtnls_enface.fundus import Fundus
@@ -27,24 +28,40 @@ class CircleField(GridFieldEnum):
 
 
 class CircleGrid(Grid):
-    """Circle-based grid centered midway between OD and fovea.
+    """Circle-based grid centered along the OD-fovea axis.
 
-    The circle has radius: od_to_fovea.length + retina.disc.circle.r (scaled by `multiplier`).
+    `multiplier` controls the center position from optic disc (0.0) to fovea
+    (1.0), and the radius is multiplier * OD-fovea distance + optic disc radius.
+    Optionally crops bands parallel to the OD-fovea axis from both sides.
     Exposes boolean masks for the full circle (grid) and its superior/inferior hemifields
     split by a line through the circle center perpendicular to the OD–fovea axis.
     """
 
-    def __init__(self, retina: Fundus, resolution, mask, multiplier: float = 1.0):
+    def __init__(
+        self,
+        retina: Fundus,
+        resolution,
+        mask,
+        multiplier: float = 1.0,
+        band_crop_fraction: float = 0.0,
+    ):
         super().__init__(retina, resolution, mask)
         self.retina = retina
-        self.multiplier = multiplier
+        self.multiplier = float(multiplier)
+        self.band_crop_fraction = self._validate_band_crop_fraction(band_crop_fraction)
 
-        # Geometry from OD–fovea
         od_to_fovea = Line(retina.disc.center_of_mass, retina.fovea_location)
-        self._center = od_to_fovea.point_at(0.5)
-        base_radius = od_to_fovea.length/2 + retina.disc.circle.r
-        self._r = float(base_radius) * float(self.multiplier)
+        self._center = od_to_fovea.point_at(self.multiplier)
+        self._r = self.multiplier * od_to_fovea.length + retina.disc.circle.r
         self._angle_deg = float(od_to_fovea.orientation())
+
+    @staticmethod
+    def _validate_band_crop_fraction(value: float) -> float:
+        """Validate the fraction cropped from each side of the circle."""
+        value = float(value)
+        if not 0.0 <= value < 0.5:
+            raise ValueError("band_crop_fraction must be in the range [0.0, 0.5)")
+        return value
 
     @cached_property
     def _theta(self) -> float:
@@ -73,7 +90,7 @@ class CircleGrid(Grid):
         """Boolean mask of the full circle."""
         r2 = self._r * self._r
         inside = (self._dx * self._dx) + (self._dy * self._dy) <= r2
-        return inside
+        return inside & self._band_crop_mask
 
     @cached_property
     def _perp_unit(self) -> tuple[float, float]:
@@ -83,6 +100,21 @@ class CircleGrid(Grid):
         px, py = -s, c
         norm = math.hypot(px, py)
         return px / norm, py / norm
+
+    @cached_property
+    def _perp_coord(self) -> np.ndarray:
+        """Signed pixel distance perpendicular to the OD-fovea axis."""
+        px, py = self._perp_unit
+        return self._dx * px + self._dy * py
+
+    @cached_property
+    def _band_crop_mask(self) -> np.ndarray:
+        """Mask that removes bands parallel to the OD-fovea axis."""
+        if self.band_crop_fraction == 0.0:
+            return np.ones((self.h, self.w), dtype=bool)
+
+        allowed_half_width = self._r * (1.0 - 2.0 * self.band_crop_fraction)
+        return np.abs(self._perp_coord) <= allowed_half_width
 
     @cached_property
     def superior(self) -> np.ndarray:
@@ -101,15 +133,22 @@ class CircleGrid(Grid):
 
     def plot(self, ax, field: CircleField | GridField | None = None):
         """Plot the circle outline, divider, and optionally highlight a field."""
-        # Outline
-        patch = MplCircle(
-            (self._center.x, self._center.y),
-            radius=self._r,
-            fill=False,
-            edgecolor="white",
-            linewidth=0.5,
-        )
-        ax.add_artist(patch)
+        if self.band_crop_fraction == 0.0:
+            patch = MplCircle(
+                (self._center.x, self._center.y),
+                radius=self._r,
+                fill=False,
+                edgecolor="white",
+                linewidth=0.5,
+            )
+            ax.add_artist(patch)
+        else:
+            ax.contour(
+                self.grid.astype(float),
+                levels=[0.5],
+                colors="white",
+                linewidths=0.5,
+            )
 
         # Divider line (parallel to OD–fovea), clipped to the circle interior (diameter)
         c, s = self._cos_sin
@@ -137,5 +176,3 @@ class CircleGrid(Grid):
 
     # Link enum type to grid
     FieldEnum = CircleField
-
-

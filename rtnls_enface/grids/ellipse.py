@@ -35,10 +35,20 @@ class EllipseGrid(Grid):
     the ellipse center perpendicular to the OD–fovea axis.
     """
 
-    def __init__(self, retina: Fundus, resolution, mask, multiplier: float = 1.0):
+    def __init__(
+        self,
+        retina: Fundus,
+        resolution,
+        mask,
+        multiplier: float = 1.0,
+        band_crop_fraction: float = 0.0,
+    ):
         super().__init__(retina, resolution, mask)
         self.retina = retina
-        self.multiplier = multiplier
+        self.multiplier = float(multiplier)
+        self.band_crop_fraction = self._validate_band_crop_fraction(
+            band_crop_fraction
+        )
 
         # Geometry from OD–fovea
         od_to_fovea = Line(retina.disc.center_of_mass, retina.fovea_location)
@@ -47,6 +57,14 @@ class EllipseGrid(Grid):
         self._a = float(base_radius) * float(self.multiplier)
         self._b = 1.5 * float(base_radius) * float(self.multiplier)
         self._angle_deg = float(od_to_fovea.orientation())
+
+    @staticmethod
+    def _validate_band_crop_fraction(value: float) -> float:
+        """Validate the fraction cropped from each side of the ellipse."""
+        value = float(value)
+        if not 0.0 <= value < 0.5:
+            raise ValueError("band_crop_fraction must be in the range [0.0, 0.5)")
+        return value
 
     @cached_property
     def _theta(self) -> float:
@@ -79,13 +97,23 @@ class EllipseGrid(Grid):
         return xprime, yprime
 
     @cached_property
+    def _band_crop_mask(self) -> np.ndarray:
+        """Mask that removes bands parallel to the OD-fovea axis."""
+        if self.band_crop_fraction == 0.0:
+            return np.ones((self.h, self.w), dtype=bool)
+
+        _, yprime = self._xprime_yprime
+        allowed_half_width = self._b * (1.0 - 2.0 * self.band_crop_fraction)
+        return np.abs(yprime) <= allowed_half_width
+
+    @cached_property
     def grid(self) -> np.ndarray:
         """Boolean mask of the full ellipse."""
         xprime, yprime = self._xprime_yprime
         a2 = (self._a * self._a)
         b2 = (self._b * self._b)
         inside = (xprime * xprime) / a2 + (yprime * yprime) / b2 <= 1.0
-        return inside
+        return inside & self._band_crop_mask
 
     @cached_property
     def _perp_unit(self) -> tuple[float, float]:
@@ -114,16 +142,24 @@ class EllipseGrid(Grid):
     def plot(self, ax, field: EllipseField | GridField | None = None):
         """Plot the ellipse outline, divider, and optionally highlight a field."""
         # Outline
-        patch = MplEllipse(
-            (self._center.x, self._center.y),
-            width=2 * self._a,
-            height=2 * self._b,
-            angle=self._angle_deg,
-            fill=False,
-            edgecolor="white",
-            linewidth=0.5,
-        )
-        ax.add_artist(patch)
+        if self.band_crop_fraction == 0.0:
+            patch = MplEllipse(
+                (self._center.x, self._center.y),
+                width=2 * self._a,
+                height=2 * self._b,
+                angle=self._angle_deg,
+                fill=False,
+                edgecolor="white",
+                linewidth=0.5,
+            )
+            ax.add_artist(patch)
+        else:
+            ax.contour(
+                self.grid.astype(float),
+                levels=[0.5],
+                colors="white",
+                linewidths=0.5,
+            )
 
         # Divider line (parallel to OD–fovea), clipped to the ellipse interior (±a)
         c, s = self._cos_sin
