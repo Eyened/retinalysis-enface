@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import copy
 from enum import Enum
-from typing import TYPE_CHECKING, List, Union
+from functools import cached_property
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -35,6 +37,7 @@ class Grid(ABC):
         self.h, self.w = image.resolution
         self.resolution = resolution
         self.mask = mask
+        self._full_field_pixel_count_cache: Dict[GridFieldEnum, int] = {}
 
     def field(self, field: "GridFieldEnum") -> "GridField":
         """Return a GridField bound to this grid for the given field enum."""
@@ -46,24 +49,80 @@ class Grid(ABC):
             return field.mask
         return getattr(self, field.value)
 
+
+    @staticmethod
+    def _circle_bounds(
+        center_x: float, center_y: float, radius: float
+    ) -> Tuple[int, int, int, int]:
+        """Return an integer canvas that fully contains a circular extent."""
+        x0 = int(np.floor(center_x - radius))
+        y0 = int(np.floor(center_y - radius))
+        x1 = int(np.ceil(center_x + radius)) + 1
+        y1 = int(np.ceil(center_y + radius)) + 1
+        return x0, y0, x1, y1
+
+    def _full_field_bounds(
+        self, field: "GridFieldEnum"
+    ) -> Optional[Tuple[int, int, int, int]]:
+        """Return a canvas in image coordinates that contains the complete field."""
+        return None
+
+    def _shift_canvas_origin(self, x_offset: int, y_offset: int) -> None:
+        """Translate geometry into a virtual canvas whose origin is offset."""
+        raise NotImplementedError
+
+
+    @staticmethod
+    def _clear_cached_properties(grid: "Grid") -> None:
+        for grid_class in type(grid).__mro__:
+            for name, descriptor in vars(grid_class).items():
+                if isinstance(descriptor, cached_property):
+                    grid.__dict__.pop(name, None)
+
+    def full_field_pixel_count(
+        self, field: Union["GridFieldEnum", "GridField"]
+    ) -> int:
+        """Return the rasterized area of a field before image-boundary clipping."""
+        field_enum = field.enum if isinstance(field, GridField) else field
+        cached = self._full_field_pixel_count_cache.get(field_enum)
+        if cached is not None:
+            return cached
+
+        bounds = self._full_field_bounds(field_enum)
+        if bounds is None:
+            count = int(np.count_nonzero(self._mask_from(field_enum)))
+        else:
+            x0, y0, x1, y1 = bounds
+            if x1 <= x0 or y1 <= y0:
+                count = 0
+            else:
+                padded_grid = copy(self)
+                self._clear_cached_properties(padded_grid)
+                padded_grid.h = y1 - y0
+                padded_grid.w = x1 - x0
+                padded_grid.mask = None
+                padded_grid._shift_canvas_origin(x0, y0)
+                count = int(np.count_nonzero(padded_grid._mask_from(field_enum)))
+
+        self._full_field_pixel_count_cache[field_enum] = count
+        return count
+
     def field_visible(self, field: Union["GridFieldEnum", "GridField"]):
-        """Return True if the field is completely visible/contained in the fundus image."""
-        f = self._mask_from(field)
-        if self.mask is None:
-            return True
-        return np.all(f <= self.mask)
+        """Return whether the complete geometric field is visible."""
+        return self.field_within_bounds(field) == 1.0
 
     def field_within_bounds(self, field: Union["GridFieldEnum", "GridField"]) -> float:
-        """Return the fraction of the field that is within the mask bounds."""
+        """Return the fraction of the geometric field that is within image and mask bounds."""
         f = self._mask_from(field)
-        if self.mask is None:
-            return 1.0
-        # Count pixels in field that are also within mask
-        field_pixels = np.sum(f)
+        field_pixels = self.full_field_pixel_count(field)
         if field_pixels == 0:
             return 0.0
-        within_bounds_pixels = np.sum(f & self.mask)
-        return within_bounds_pixels / field_pixels
+        within_bounds_pixels = (
+            np.count_nonzero(f)
+            if self.mask is None
+            else np.count_nonzero(f & self.mask)
+        )
+        return float(within_bounds_pixels) / float(field_pixels)
 
     def point_in_field(self, point: Point, field: Union["GridFieldEnum", "GridField"]):
         mask = self._mask_from(field)
@@ -108,3 +167,7 @@ class GridField:
 
     def plot(self, ax):
         self._grid.plot(ax, self._enum)
+
+    def full_pixel_count(self) -> int:
+        """Return the field area before image-boundary clipping."""
+        return self._grid.full_field_pixel_count(self)

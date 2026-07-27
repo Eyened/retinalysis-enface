@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from matplotlib.patches import Circle as MplCircle
 
-from rtnls_enface.base import Line
+from rtnls_enface.base import Line, Point
 
 from .base import Grid, GridField, GridFieldEnum
 
@@ -30,8 +30,9 @@ class CircleField(GridFieldEnum):
 class CircleGrid(Grid):
     """Circle-based grid centered along the OD-fovea axis.
 
-    `multiplier` controls the center position from optic disc (0.0) to fovea
-    (1.0), and the radius is multiplier * OD-fovea distance + optic disc radius.
+    `center` controls the center position from optic disc (0.0) to fovea (1.0).
+    The radius is `radius_multiplier * OD-fovea distance + optic disc radius`.
+    `multiplier` is a deprecated alias for `center`.
     Optionally crops bands parallel to the OD-fovea axis from both sides.
     Exposes boolean masks for the full circle (grid) and its superior/inferior hemifields
     split by a line through the circle center perpendicular to the OD–fovea axis.
@@ -42,18 +43,46 @@ class CircleGrid(Grid):
         retina: Fundus,
         resolution,
         mask,
-        multiplier: float = 1.0,
+        multiplier: float | None = None,
         band_crop_fraction: float = 0.0,
+        center: float | None = None,
+        radius_multiplier: float = 1.0,
     ):
         super().__init__(retina, resolution, mask)
         self.retina = retina
-        self.multiplier = float(multiplier)
+        self.center = self._resolve_center(center=center, multiplier=multiplier)
+        self.multiplier = self.center  # deprecated alias for center
+        self.radius_multiplier = float(radius_multiplier)
         self.band_crop_fraction = self._validate_band_crop_fraction(band_crop_fraction)
 
         od_to_fovea = Line(retina.disc.center_of_mass, retina.fovea_location)
-        self._center = od_to_fovea.point_at(self.multiplier)
-        self._r = self.multiplier * od_to_fovea.length + retina.disc.circle.r
+        self._center = od_to_fovea.point_at(self.center)
+        self._r = (
+            self.radius_multiplier * od_to_fovea.length + retina.disc.circle.r
+        )
         self._angle_deg = float(od_to_fovea.orientation())
+
+    def _full_field_bounds(self, field: GridFieldEnum):
+        return self._circle_bounds(self._center.x, self._center.y, self._r)
+
+    def _shift_canvas_origin(self, x_offset: int, y_offset: int) -> None:
+        self._center = Point(
+            self._center.y - y_offset, self._center.x - x_offset
+        )
+
+    @staticmethod
+    def _resolve_center(
+        center: float | None, multiplier: float | None
+    ) -> float:
+        """Resolve center from `center` or deprecated `multiplier` alias."""
+        if center is not None and multiplier is not None:
+            raise ValueError(
+                "Pass only one of 'center' or 'multiplier'; "
+                "'multiplier' is a deprecated alias for 'center'"
+            )
+        if center is None and multiplier is None:
+            return 1.0
+        return float(center if center is not None else multiplier)
 
     @staticmethod
     def _validate_band_crop_fraction(value: float) -> float:

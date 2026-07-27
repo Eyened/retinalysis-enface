@@ -58,6 +58,14 @@ class ETDRSGrid(Grid):
         self.laterality = retina.laterality
         self.multiplier = multiplier
 
+    def _full_field_bounds(self, field: GridFieldEnum):
+        radius = 3.0 * self.multiplier / self.resolution
+        return self._circle_bounds(self.fovea_x, self.fovea_y, radius)
+
+    def _shift_canvas_origin(self, x_offset: int, y_offset: int) -> None:
+        self.fovea_x -= x_offset
+        self.fovea_y -= y_offset
+
     def calculate_area(self, binary_image):
         return binary_image.sum() * self.resolution**2
 

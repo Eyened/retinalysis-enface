@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Generic, Type, TypeVar
+from math import isfinite
+from numbers import Real
+from typing import ClassVar, Generic, Optional, Type, TypeVar
 
 from rtnls_enface.grids.base import Grid, GridFieldEnum
 from rtnls_enface.grids.circle import CircleGrid
@@ -13,6 +15,19 @@ from rtnls_enface.grids.hemifields import HemifieldGrid
 
 GridT = TypeVar("GridT", bound=Grid)
 FieldEnumT = TypeVar("FieldEnumT", bound=GridFieldEnum)
+
+
+def _validate_min_area_within_bounds(value: Optional[float]) -> None:
+    """Validate an optional fraction of a grid field that must be visible."""
+    if value is None:
+        return
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, Real)
+        or not isfinite(float(value))
+        or not 0.0 <= float(value) <= 1.0
+    ):
+        raise ValueError("min_area_within_bounds must be a finite fraction in [0.0, 1.0]")
 
 
 @dataclass(frozen=True)
@@ -29,6 +44,9 @@ class BaseGridSpecification(ABC, Generic[GridT]):
     def __post_init__(self) -> None:
         if not self.name:
             object.__setattr__(self, "name", self.default_name)
+        _validate_min_area_within_bounds(
+            getattr(self, "min_area_within_bounds", None)
+        )
 
     @property
     @abstractmethod
@@ -48,6 +66,7 @@ class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
     default_name: ClassVar[str] = "etdrs"
     display_name: ClassVar[str] = "ETDRS"
     multiplier: float = 1.0
+    min_area_within_bounds: Optional[float] = None
 
     @property
     def grid_cls(self) -> Type[ETDRSGrid]:
@@ -61,15 +80,36 @@ class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
 class CircleGridSpecification(BaseGridSpecification[CircleGrid]):
     """Hyper-parameters for OD–fovea circle grids.
 
+    ``center`` places the circle along the OD–fovea axis (0 = disc, 1 = fovea).
+    ``radius_multiplier`` scales the OD–fovea distance term of the radius
+    (``radius = radius_multiplier * d_ODF + disc radius``). ``multiplier`` is a
+    deprecated alias for ``center``.
     ``name`` is an optional compact token override used when serializing grid
-    specifications into feature names. The option is defined by the base
-    specification and is available consistently on every grid type.
+    specifications into feature names.
     """
 
     default_name: ClassVar[str] = "crcl"
     display_name: ClassVar[str] = "Circle"
-    multiplier: float = 1.0
+    center: float | None = None
+    radius_multiplier: float = 1.0
     band_crop_fraction: float = 0.0
+    multiplier: float | None = None  # deprecated alias for center
+    min_area_within_bounds: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.center is not None and self.multiplier is not None:
+            raise ValueError(
+                "Pass only one of 'center' or 'multiplier'; "
+                "'multiplier' is a deprecated alias for 'center'"
+            )
+        resolved_center = (
+            1.0
+            if self.center is None and self.multiplier is None
+            else float(self.center if self.center is not None else self.multiplier)
+        )
+        object.__setattr__(self, "center", resolved_center)
+        object.__setattr__(self, "multiplier", None)
 
     @property
     def grid_cls(self) -> Type[CircleGrid]:
@@ -77,7 +117,8 @@ class CircleGridSpecification(BaseGridSpecification[CircleGrid]):
 
     def init_kwargs(self) -> dict[str, object]:
         return {
-            "multiplier": self.multiplier,
+            "center": self.center,
+            "radius_multiplier": self.radius_multiplier,
             "band_crop_fraction": self.band_crop_fraction,
         }
 
@@ -90,6 +131,7 @@ class EllipseGridSpecification(BaseGridSpecification[EllipseGrid]):
     display_name: ClassVar[str] = "Ellipse"
     multiplier: float = 1.0
     band_crop_fraction: float = 0.0
+    min_area_within_bounds: Optional[float] = None
 
     @property
     def grid_cls(self) -> Type[EllipseGrid]:
@@ -110,6 +152,7 @@ class DiscCenteredGridSpecification(BaseGridSpecification[DiscCenteredGrid]):
     display_name: ClassVar[str] = "Disc"
     multiplier: float = 1.0
     band_crop_fraction: float = 0.0
+    min_area_within_bounds: Optional[float] = None
 
     @property
     def grid_cls(self) -> Type[DiscCenteredGrid]:
@@ -128,6 +171,7 @@ class HemifieldGridSpecification(BaseGridSpecification[HemifieldGrid]):
 
     default_name: ClassVar[str] = "hf"
     display_name: ClassVar[str] = "Hemifield"
+    min_area_within_bounds: Optional[float] = None
 
     @property
     def grid_cls(self) -> Type[HemifieldGrid]:
@@ -140,6 +184,10 @@ class BaseGridFieldSpecification(Generic[FieldEnumT]):
 
     grid_spec: BaseGridSpecification
     field: FieldEnumT
+    min_area_within_bounds: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        _validate_min_area_within_bounds(self.min_area_within_bounds)
 
 
 @dataclass(frozen=True)

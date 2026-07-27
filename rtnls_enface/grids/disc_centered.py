@@ -76,6 +76,16 @@ class DiscCenteredGrid(Grid):
             raise ValueError("band_crop_fraction must be in the range [0.0, 0.5)")
         return value
 
+    def _full_field_bounds(self, field: GridFieldEnum):
+        radius = (
+            self.disc_radius_mm + 0.6 * self.multiplier * self.odfd
+        ) / self.resolution
+        return self._circle_bounds(self.disc_cx, self.disc_cy, radius)
+
+    def _shift_canvas_origin(self, x_offset: int, y_offset: int) -> None:
+        self.disc_cx -= x_offset
+        self.disc_cy -= y_offset
+
     def calculate_area(self, binary_image):
         return binary_image.sum() * self.resolution**2
 

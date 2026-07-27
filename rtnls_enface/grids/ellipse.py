@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from matplotlib.patches import Ellipse as MplEllipse
 
-from rtnls_enface.base import Line
+from rtnls_enface.base import Line, Point
 from .base import Grid, GridFieldEnum, GridField
 
 if TYPE_CHECKING:
@@ -57,6 +57,21 @@ class EllipseGrid(Grid):
         self._a = float(base_radius) * float(self.multiplier)
         self._b = 1.5 * float(base_radius) * float(self.multiplier)
         self._angle_deg = float(od_to_fovea.orientation())
+
+    def _full_field_bounds(self, field: GridFieldEnum):
+        c, s = self._cos_sin
+        x_radius = math.sqrt((self._a * c) ** 2 + (self._b * s) ** 2)
+        y_radius = math.sqrt((self._a * s) ** 2 + (self._b * c) ** 2)
+        x0 = int(np.floor(self._center.x - x_radius))
+        y0 = int(np.floor(self._center.y - y_radius))
+        x1 = int(np.ceil(self._center.x + x_radius)) + 1
+        y1 = int(np.ceil(self._center.y + y_radius)) + 1
+        return x0, y0, x1, y1
+
+    def _shift_canvas_origin(self, x_offset: int, y_offset: int) -> None:
+        self._center = Point(
+            self._center.y - y_offset, self._center.x - x_offset
+        )
 
     @staticmethod
     def _validate_band_crop_fraction(value: float) -> float:
