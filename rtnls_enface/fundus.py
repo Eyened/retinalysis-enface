@@ -30,6 +30,7 @@ from rtnls_enface.grids import (
     Grid,
     GridField,
     HemifieldGrid,
+    ODOnlyGrid,
 )
 from rtnls_enface.grids.specifications import (
     BaseGridFieldSpecification,
@@ -39,6 +40,7 @@ from rtnls_enface.grids.specifications import (
     EllipseGridSpecification,
     ETDRSGridSpecification,
     HemifieldGridSpecification,
+    ODOnlyGridSpecification,
 )
 from rtnls_enface.utils.data_loading import open_binary_mask, open_mask
 from rtnls_enface.utils.image import match_resolution
@@ -55,6 +57,7 @@ _DEFAULT_GRID_CLASSES: Tuple[Type[Grid], ...] = (
     CircleGrid,
     DiscCenteredGrid,
     HemifieldGrid,
+    ODOnlyGrid,
 )
 
 _DEFAULT_SPEC_BY_GRID: Dict[Type[Grid], BaseGridSpecification] = {
@@ -63,6 +66,7 @@ _DEFAULT_SPEC_BY_GRID: Dict[Type[Grid], BaseGridSpecification] = {
     CircleGrid: CircleGridSpecification(),
     DiscCenteredGrid: DiscCenteredGridSpecification(),
     HemifieldGrid: HemifieldGridSpecification(),
+    ODOnlyGrid: ODOnlyGridSpecification(),
 }
 
 
@@ -292,6 +296,17 @@ class Fundus(EnfaceImage):
             raise RuntimeError("Cannot build grids without disc and fovea information")
         return 4.75 / self.disc_fovea_distance
 
+    def _resolve_grid_resolution(self, spec: BaseGridSpecification) -> float:
+        """Return mm/px for a grid, falling back to pixel units when allowed."""
+        if self.disc is None:
+            raise RuntimeError("Cannot build grids without disc information")
+        try:
+            return self._grid_resolution()
+        except RuntimeError:
+            if getattr(spec, "requires_fovea", True):
+                raise
+            return 1.0
+
     def _grid_mask(self):
         return self.roi_mask
 
@@ -301,7 +316,7 @@ class Fundus(EnfaceImage):
         if grid is None:
             grid = spec.grid_cls(
                 self,
-                resolution=self._grid_resolution(),
+                resolution=self._resolve_grid_resolution(spec),
                 mask=self._grid_mask(),
                 **spec.init_kwargs(),
             )

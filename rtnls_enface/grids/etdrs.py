@@ -23,31 +23,31 @@ class ETDRSField(GridFieldEnum):
 
 
 class ETDRSSubfield(ETDRSField):
-    CSF = "CSF"
-    SIM = "SIM"
-    NIM = "NIM"
-    TIM = "TIM"
-    IIM = "IIM"
-    SOM = "SOM"
-    NOM = "NOM"
-    TOM = "TOM"
-    IOM = "IOM"
+    CSF = "CSF", "central subfield"
+    SIM = "SIM", "superior inner subfield"
+    NIM = "NIM", "nasal inner subfield"
+    TIM = "TIM", "temporal inner subfield"
+    IIM = "IIM", "inferior inner subfield"
+    SOM = "SOM", "superior outer subfield"
+    NOM = "NOM", "nasal outer subfield"
+    TOM = "TOM", "temporal outer subfield"
+    IOM = "IOM", "inferior outer subfield"
 
 
 class ETDRSRing(ETDRSField):
-    FullGrid = "grid"
-    Center = "center"
-    Inner = "inner"
-    Outer = "outer"
+    FullGrid = "grid", "full region"
+    Center = "center", "central region"
+    Inner = "inner", "inner ring"
+    Outer = "outer", "outer ring"
 
 
 class ETDRSQuadrant(ETDRSField):
-    Superior = "quadrant_superior"
-    Inferior = "quadrant_inferior"
-    Nasal = "quadrant_nasal"
-    Temporal = "quadrant_temporal"
-    Right = "quadrant_right"
-    Left = "quadrant_left"
+    Superior = "quadrant_superior", "superior quadrant"
+    Inferior = "quadrant_inferior", "inferior quadrant"
+    Nasal = "quadrant_nasal", "nasal quadrant"
+    Temporal = "quadrant_temporal", "temporal quadrant"
+    Right = "quadrant_right", "right quadrant"
+    Left = "quadrant_left", "left quadrant"
 
 
 class ETDRSGrid(Grid):

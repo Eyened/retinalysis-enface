@@ -18,9 +18,9 @@ if TYPE_CHECKING:
 class CircleField(GridFieldEnum):
     """Fields of CircleGrid."""
 
-    Superior = "superior"
-    Inferior = "inferior"
-    FullGrid = "grid"
+    Superior = "superior", "superior region"
+    Inferior = "inferior", "inferior region"
+    FullGrid = "grid", "full region"
 
     @staticmethod
     def grid():

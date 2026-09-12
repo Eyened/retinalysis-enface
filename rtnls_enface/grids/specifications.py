@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import isfinite
 from numbers import Real
 from typing import ClassVar, Generic, Optional, Type, TypeVar
@@ -12,6 +12,7 @@ from rtnls_enface.grids.disc_centered import DiscCenteredGrid
 from rtnls_enface.grids.ellipse import EllipseGrid
 from rtnls_enface.grids.etdrs import ETDRSGrid
 from rtnls_enface.grids.hemifields import HemifieldGrid
+from rtnls_enface.grids.od_only import ODOnlyGrid
 
 GridT = TypeVar("GridT", bound=Grid)
 FieldEnumT = TypeVar("FieldEnumT", bound=GridFieldEnum)
@@ -38,12 +39,17 @@ class BaseGridSpecification(ABC, Generic[GridT]):
     # specification can use it in feature names. Concrete specifications
     # provide their normal value through ``default_name`` below.
     name: str = ""
+    description: str = field(default="", compare=False, hash=False)
     default_name: ClassVar[str] = ""
     display_name: ClassVar[str] = ""
+    default_description: ClassVar[str] = "a retinal measurement grid"
+    requires_fovea: ClassVar[bool] = True
 
     def __post_init__(self) -> None:
         if not self.name:
             object.__setattr__(self, "name", self.default_name)
+        if not self.description:
+            object.__setattr__(self, "description", self.default_description)
         _validate_min_area_within_bounds(
             getattr(self, "min_area_within_bounds", None)
         )
@@ -65,6 +71,9 @@ class ETDRSGridSpecification(BaseGridSpecification[ETDRSGrid]):
 
     default_name: ClassVar[str] = "etdrs"
     display_name: ClassVar[str] = "ETDRS"
+    default_description: ClassVar[str] = (
+        "a fovea-centered ETDRS grid with ring radii of 0.5, 1.5, and 3.0 mm"
+    )
     multiplier: float = 1.0
     min_area_within_bounds: Optional[float] = None
 
@@ -90,6 +99,10 @@ class CircleGridSpecification(BaseGridSpecification[CircleGrid]):
 
     default_name: ClassVar[str] = "crcl"
     display_name: ClassVar[str] = "Circle"
+    default_description: ClassVar[str] = (
+        "a circular grid positioned along the optic-disc–fovea axis and scaled "
+        "to the distance between these landmarks"
+    )
     center: float | None = None
     radius_multiplier: float = 1.0
     band_crop_fraction: float = 0.0
@@ -129,6 +142,10 @@ class EllipseGridSpecification(BaseGridSpecification[EllipseGrid]):
 
     default_name: ClassVar[str] = "elps"
     display_name: ClassVar[str] = "Ellipse"
+    default_description: ClassVar[str] = (
+        "an ellipse centered midway between the optic disc and fovea, aligned "
+        "with their axis and scaled to their separation"
+    )
     multiplier: float = 1.0
     band_crop_fraction: float = 0.0
     min_area_within_bounds: Optional[float] = None
@@ -150,6 +167,9 @@ class DiscCenteredGridSpecification(BaseGridSpecification[DiscCenteredGrid]):
 
     default_name: ClassVar[str] = "disc"
     display_name: ClassVar[str] = "Disc"
+    default_description: ClassVar[str] = (
+        "an optic-disc-centered annulus scaled to the optic-disc–fovea distance"
+    )
     multiplier: float = 1.0
     band_crop_fraction: float = 0.0
     min_area_within_bounds: Optional[float] = None
@@ -171,11 +191,44 @@ class HemifieldGridSpecification(BaseGridSpecification[HemifieldGrid]):
 
     default_name: ClassVar[str] = "hf"
     display_name: ClassVar[str] = "Hemifield"
+    default_description: ClassVar[str] = (
+        "the visible retina divided into superior and inferior regions by the "
+        "optic-disc–fovea axis"
+    )
     min_area_within_bounds: Optional[float] = None
 
     @property
     def grid_cls(self) -> Type[HemifieldGrid]:
         return HemifieldGrid
+
+
+@dataclass(frozen=True)
+class ODOnlyGridSpecification(BaseGridSpecification[ODOnlyGrid]):
+    """Hyper-parameters for fixed-pixel optic-disc–centered grids."""
+
+    default_name: ClassVar[str] = "odonly"
+    display_name: ClassVar[str] = "OD-only"
+    default_description: ClassVar[str] = (
+        "a fixed-radius circular grid centered on the optic disc without "
+        "foveal localization"
+    )
+    requires_fovea: ClassVar[bool] = False
+    radius_px: float = 400.0
+    min_area_within_bounds: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        radius_px = float(self.radius_px)
+        if not isfinite(radius_px) or radius_px <= 0:
+            raise ValueError("radius_px must be a positive finite value")
+        object.__setattr__(self, "radius_px", radius_px)
+
+    @property
+    def grid_cls(self) -> Type[ODOnlyGrid]:
+        return ODOnlyGrid
+
+    def init_kwargs(self) -> dict[str, object]:
+        return {"radius_px": self.radius_px}
 
 
 @dataclass(frozen=True)
@@ -188,6 +241,11 @@ class BaseGridFieldSpecification(Generic[FieldEnumT]):
 
     def __post_init__(self) -> None:
         _validate_min_area_within_bounds(self.min_area_within_bounds)
+
+    @property
+    def description(self) -> str:
+        """Return a publication-facing description of this region of interest."""
+        return f"the {self.field.friendly_name} of {self.grid_spec.description}"
 
 
 @dataclass(frozen=True)

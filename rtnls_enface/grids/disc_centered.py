@@ -21,26 +21,26 @@ class DiscCenteredField(GridFieldEnum):
         return DiscCenteredGrid
 
 class DiscCenteredHemifield(DiscCenteredField):
-    Superior = "superior"
-    Inferior = "inferior"
-    Temporal = "temporal"
-    Nasal = "nasal"
+    Superior = "superior", "superior region"
+    Inferior = "inferior", "inferior region"
+    Temporal = "temporal", "temporal region"
+    Nasal = "nasal", "nasal region"
 
 
 class DiscCenteredRing(DiscCenteredField):
-    FullGrid = "grid"
-    Center = "center"
-    Inner = "inner"
-    Outer = "outer"
+    FullGrid = "grid", "full region"
+    Center = "center", "middle ring"
+    Inner = "inner", "inner ring"
+    Outer = "outer", "outer ring"
 
 
 class DiscCenteredQuadrant(DiscCenteredField):
-    Superior = "quadrant_superior"
-    Inferior = "quadrant_inferior"
-    Nasal = "quadrant_nasal"
-    Temporal = "quadrant_temporal"
-    Right = "quadrant_right"
-    Left = "quadrant_left"
+    Superior = "quadrant_superior", "superior quadrant"
+    Inferior = "quadrant_inferior", "inferior quadrant"
+    Nasal = "quadrant_nasal", "nasal quadrant"
+    Temporal = "quadrant_temporal", "temporal quadrant"
+    Right = "quadrant_right", "right quadrant"
+    Left = "quadrant_left", "left quadrant"
 
 
 class DiscCenteredGrid(Grid):

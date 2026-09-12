@@ -4,4 +4,5 @@ from .disc_centered import *
 from .ellipse import *
 from .etdrs import *
 from .hemifields import *
+from .od_only import *
 from .specifications import *

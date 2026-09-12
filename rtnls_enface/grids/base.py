@@ -17,6 +17,17 @@ if TYPE_CHECKING:
 class GridFieldEnum(Enum):
     """Fields of the grid."""
 
+    def __new__(cls, value: str, friendly_name: str | None = None):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj._friendly_name = friendly_name or value.replace("_", " ")
+        return obj
+
+    @property
+    def friendly_name(self) -> str:
+        """Return the publication-facing name of this region of interest."""
+        return self._friendly_name
+
     @staticmethod
     @abstractmethod
     def grid():

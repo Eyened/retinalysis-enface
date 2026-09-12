@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 class HemifieldField(GridFieldEnum):
     """Fields of HemifieldGrid."""
 
-    Superior = "superior"
-    Inferior = "inferior"
-    FullGrid = "grid"
+    Superior = "superior", "superior region"
+    Inferior = "inferior", "inferior region"
+    FullGrid = "grid", "full region"
 
     @staticmethod
     def grid():
