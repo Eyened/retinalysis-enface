@@ -51,7 +51,7 @@ class EllipseGrid(Grid):
         )
 
         # Geometry from OD–fovea
-        od_to_fovea = Line(retina.disc.center_of_mass, retina.fovea_location)
+        od_to_fovea = Line(retina.disc.center, retina.fovea_location)
         self._center = od_to_fovea.point_at(0.5)
         base_radius = od_to_fovea.length / 2 + retina.disc.circle.r
         self._a = float(base_radius) * float(self.multiplier)

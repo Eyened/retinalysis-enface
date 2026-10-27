@@ -9,8 +9,10 @@ import cv2
 import numpy as np
 from scipy import ndimage
 from scipy.spatial import distance
+from scipy.optimize import brentq
 
 from rtnls_enface.base import Circle, Point, TuplePoint
+from rtnls_enface.disc_ellipse import EllipseFitError, OpticDiscEllipseFit, fit_disc_ellipse
 from rtnls_enface.utils.data_loading import open_mask
 
 if TYPE_CHECKING:
@@ -57,13 +59,49 @@ class OpticDisc:
         self.num_ccs = num_features
         self.mask = mask
         self.fundus = fundus
+        self.ellipse = self.fit_ellipse()
+
+    def fit_ellipse(
+        self, valid_mask=None, *, boundary_margin_px: float = 5.0,
+        roundness_weight: float = 0.02, robust_scale_px: float = 2.0,
+    ) -> OpticDiscEllipseFit:
+        """Reconstruct a possibly clipped OD ellipse from its visible contour.
+
+        Uses the attached fundus ROI unless ``valid_mask`` is supplied; without
+        either, only image edges are known. Pass the CFI mask to censor an internal
+        field-of-view boundary. All coordinates/margins refer to ``self.mask``'s
+        resolution (normally 1024), not the original acquisition resolution.
+
+        Construction stores one accepted default fit in ``ellipse``. Explicit
+        calls return an independently validated fit without replacing it.
+        Observed segmentation and its center of mass remain available unchanged.
+        """
+        if valid_mask is None:
+            valid_mask = getattr(self.fundus, "roi_mask", None)
+        if valid_mask is None:
+            valid_mask = np.ones(self.mask.shape, dtype=bool)
+        try:
+            fit = fit_disc_ellipse(
+                self.mask, valid_mask, boundary_margin_px=boundary_margin_px,
+                roundness_weight=roundness_weight, robust_scale_px=robust_scale_px,
+            )
+        except (EllipseFitError, cv2.error, np.linalg.LinAlgError, FloatingPointError) as exc:
+            raise InvalidDiscMaskException(str(exc)) from exc
+        if fit.is_poor_fit:
+            raise InvalidDiscMaskException("Optic-disc mask does not fit an ellipse")
+        return fit
+
+    @property
+    def center(self) -> Point:
+        """Center of the reconstructed disc, potentially outside the image."""
+        return self.ellipse.center
 
     def _disc_axis_unit_vectors(self) -> tuple[np.ndarray, np.ndarray]:
         """Return unit vectors for the temporal axis and its superior direction."""
         if self.fundus is None or self.fundus.fovea_location is None:
             raise ValueError("Fundus with fovea location must be set for disc side points")
 
-        center = self.center_of_mass
+        center = self.center
         fovea = self.fundus.fovea_location
         axis = np.array([fovea.y - center.y, fovea.x - center.x], dtype=float)
         norm = np.linalg.norm(axis)
@@ -72,38 +110,27 @@ class OpticDisc:
 
         temporal_unit = axis / norm
 
-        # Image y grows downward, so the superior-pointing perpendicular is (-dx, dy).
+        # Image y grows downward: choose the upper perpendicular in either eye.
         superior_unit = np.array([-temporal_unit[1], temporal_unit[0]], dtype=float)
+        if superior_unit[0] > 0:
+            superior_unit = -superior_unit
         return temporal_unit, superior_unit
 
     def _project_disc_side_point(self, direction: np.ndarray) -> Point:
         """Project a unit direction from the disc center onto the disc boundary."""
-        center = self.center_of_mass
-        offset = direction * float(self.circle.r)
+        center = self.center
+        theta = np.deg2rad(self.ellipse.angle_degrees)
+        dy, dx = direction
+        u = dx * np.cos(theta) + dy * np.sin(theta)
+        v = -dx * np.sin(theta) + dy * np.cos(theta)
+        a, b = self.ellipse.semi_axes
+        offset = direction / np.hypot(u / a, v / b)
         return Point(center.y + offset[0], center.x + offset[1])
 
     @cached_property
-    def circle(self):
-        if self.mask is None:
-            raise ValueError(
-                "disc segmentation not provided. Cannot calculate disc parameters"
-            )
-        contours, _ = cv2.findContours(
-            self.mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-        assert len(contours) == 1, f"Found {len(contours)} in disc, expected 1"
-
-        # calculate moments for each contour
-        disc = contours[0].squeeze()
-        M = cv2.moments(disc)
-
-        # calculate x,y coordinate of center
-        cX = int(M["m10"] / M["m00"])
-        cY = int(M["m01"] / M["m00"])
-
-        radius = np.mean(np.sqrt(np.sum((disc - np.array([cX, cY])) ** 2, axis=1)))
-        return Circle(center=Point(cY, cX), r=radius)
+    def circle(self) -> Circle:
+        """Area-equivalent circle centered on the reconstructed ellipse."""
+        return Circle(center=self.center, r=self.ellipse.equivalent_radius)
 
     @cached_property
     def temporal_point(self) -> Point:
@@ -190,7 +217,7 @@ class OpticDisc:
         return x0_padded, x1_padded, y0_padded, y1_padded
 
     def distance_to_center(self, point: TuplePoint):
-        return distance.euclidean(self.center_of_mass.tuple, point)
+        return distance.euclidean(self.center.tuple, point)
 
     def contains(self, points: List[TuplePoint]) -> bool:
         return all([bool(self.mask[p[0], p[1]]) for p in points])
@@ -237,18 +264,31 @@ class OpticDisc:
         return float(min(image_edge_distance, self.distance_to_bounds()))
 
     def closest_point(self, point: Point) -> Point:
-        # Identify the blob points
-        blob_points = np.argwhere(self.mask > 0)
-
-        # Calculate distances from each blob point to the target point
-        distances = np.sqrt(((blob_points - point.tuple) ** 2).sum(axis=1))
-
-        # Find the index of the closest point
-        closest_point_index = np.argmin(distances)
-
-        # Return the closest blob point
-        p = blob_points[closest_point_index]
-        return Point(p[0], p[1])
+        """Nearest reconstructed boundary point, including for interior queries."""
+        theta = np.deg2rad(self.ellipse.angle_degrees)
+        c, s = np.cos(theta), np.sin(theta)
+        dx, dy = point.x - self.center.x, point.y - self.center.y
+        u, v = dx * c + dy * s, -dx * s + dy * c
+        a, b = self.ellipse.semi_axes
+        x, y = abs(u), abs(v)
+        # In the first quadrant the Lagrange multiplier has a unique root.
+        # Handle the major-axis singularity explicitly (also covers the center).
+        if y < 1e-12:
+            if a == b or a * x >= a * a - b * b:
+                qx, qy = a, 0.0
+            else:
+                qx = a * a * x / (a * a - b * b)
+                qy = b * np.sqrt(max(0.0, 1 - (qx / a) ** 2))
+        else:
+            # z = lambda + b² keeps the inside root away from cancellation.
+            def equation(z):
+                return (a * x / (z + a*a - b*b))**2 + (b * y / z)**2 - 1
+            z = brentq(equation, max(np.finfo(float).tiny, b*y/2),
+                       b*b + np.hypot(a*x, b*y), xtol=1e-12)
+            qx, qy = a*a*x / (z + a*a - b*b), b*b*y / z
+        qx, qy = np.copysign(qx, u), np.copysign(qy, v)
+        return Point(self.center.y + qx*s + qy*c,
+                     self.center.x + qx*c - qy*s)
 
     @classmethod
     def from_file(cls, fpath: Union[str, Path]):

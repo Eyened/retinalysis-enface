@@ -37,7 +37,7 @@ class HemifieldGrid(Grid):
         self.retina = retina
 
         # Geometry from OD–fovea
-        od_to_fovea = Line(retina.disc.center_of_mass, retina.fovea_location)
+        od_to_fovea = Line(retina.disc.center, retina.fovea_location)
         self._center = od_to_fovea.point_at(0.5)
         self._angle_deg = float(od_to_fovea.orientation())
 

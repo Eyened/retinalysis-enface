@@ -55,7 +55,7 @@ class CircleGrid(Grid):
         self.radius_multiplier = float(radius_multiplier)
         self.band_crop_fraction = self._validate_band_crop_fraction(band_crop_fraction)
 
-        od_to_fovea = Line(retina.disc.center_of_mass, retina.fovea_location)
+        od_to_fovea = Line(retina.disc.center, retina.fovea_location)
         self._center = od_to_fovea.point_at(self.center)
         self._r = (
             self.radius_multiplier * od_to_fovea.length + retina.disc.circle.r

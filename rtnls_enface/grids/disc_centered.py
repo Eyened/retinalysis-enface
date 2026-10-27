@@ -65,7 +65,7 @@ class DiscCenteredGrid(Grid):
         # Physical distances (mm)
         self._odfd = self.resolution * retina.disc_fovea_distance
         self._disc_radius_mm = self.resolution * retina.disc.circle.r
-        od_to_fovea = Line(retina.disc.center_of_mass, retina.fovea_location)
+        od_to_fovea = Line(retina.disc.center, retina.fovea_location)
         self._angle_deg = float(od_to_fovea.orientation())
 
     @staticmethod

@@ -18,6 +18,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import Ellipse, Rectangle
 
 from rtnls_enface.base import EnfaceImage, Laterality, Layer, Point
 from rtnls_enface.bounds import make_roi_mask_from_bounds
@@ -170,7 +171,28 @@ class Fundus(EnfaceImage):
         clipped = mask_array.astype(bool) & self.mask
         return clipped.astype(mask_array.dtype, copy=False)
 
+    def _invalidate_disc_caches(self):
+        """Discard geometry and vessel caches when a disc is replaced or cleared."""
+        for name in ("disc_fovea_distance", "laterality", "disc_center_dist_sq",
+                     "disc_fovea_angle_deg", "sparsity_fovea_mask", "background_mask"):
+            self.__dict__.pop(name, None)
+        getattr(self, "_grid_cache", {}).clear()
+        for layer in getattr(self, "layers", {}).values():
+            # Skeletons exclude the observed disc; graphs, trees and segments
+            # also depend on its mask or reconstructed landmarks.
+            for cls in type(layer).__mro__:
+                for name, descriptor in vars(cls).items():
+                    if isinstance(descriptor, cached_property):
+                        layer.__dict__.pop(name, None)
+            for name in ("_cre_binary_mask_cache", "_region_segments_cache",
+                         "_region_resolved_segments_cache", "_aric_trunk_cache"):
+                getattr(layer, name, {}).clear()
+            cached_vessels = getattr(layer, "_get_vessels_cached", None)
+            if cached_vessels is not None:
+                cached_vessels.cache_clear()
+
     def load_disc(self, path_or_array: Union[None, str, np.ndarray]):
+        self._invalidate_disc_caches()
         if path_or_array is None:
             self.disc_path = None
             self.disc = None
@@ -187,7 +209,7 @@ class Fundus(EnfaceImage):
             )
             disc_mask = self._clip_mask_to_roi(disc_mask.astype(np.uint8))
             try:
-                self.disc = OpticDisc(disc_mask, fundus=self)
+                self.disc = OpticDisc(disc_mask, fundus=self, size=disc_mask.shape[0])
             except InvalidDiscMaskException:
                 warnings.warn("Invalid disc mask. Setting disc to None")
                 self.disc = None
@@ -196,13 +218,13 @@ class Fundus(EnfaceImage):
     def disc_fovea_distance(self):
         if self.disc is None or self.fovea_location is None:
             raise ValueError("Disc or fovea location not set")
-        return self.disc.center_of_mass.distance_to(self.fovea_location)
+        return self.disc.center.distance_to(self.fovea_location)
 
     @cached_property
     def laterality(self):
         if self.disc is None or self.fovea_location is None:
             return None
-        if self.disc.center_of_mass.x < self.fovea_location.x:
+        if self.disc.center.x < self.fovea_location.x:
             return Laterality.L
         return Laterality.R
 
@@ -263,6 +285,23 @@ class Fundus(EnfaceImage):
                 colors="w",
                 linewidths=0.5,
             )
+
+        if bounds and self.disc is not None:
+            fit = self.disc.ellipse
+            outline = Ellipse(
+                fit.center.tuple_xy,
+                width=2 * fit.semi_axes[0],
+                height=2 * fit.semi_axes[1],
+                angle=fit.angle_degrees,
+                fill=False, edgecolor="white", linewidth=0.75,
+            )
+            # add_artist avoids enlarging data limits for off-image geometry.
+            ax.add_artist(outline)
+            h, w = self.resolution
+            image_clip = Rectangle((-0.5, -0.5), w, h, transform=ax.transData)
+            outline.set_clip_path(image_clip.get_path(), image_clip.get_transform())
+            outline.set_clip_box(ax.bbox)
+            outline.set_in_layout(False)
 
         return ax
 
